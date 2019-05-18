@@ -1,0 +1,31 @@
+diff --git a/src/cc/compat/linux/virtual_bpf.h b/src/cc/compat/linux/virtual_bpf.h
+index ece4398c..d57a07a5 100644
+--- a/src/cc/compat/linux/virtual_bpf.h
++++ b/src/cc/compat/linux/virtual_bpf.h
+@@ -2630,6 +2630,7 @@ union bpf_attr {
+ 	FN(map_update_elem),		\
+ 	FN(map_delete_elem),		\
+ 	FN(probe_read),			\
++	FN(probe_read_stack),		\
+ 	FN(ktime_get_ns),		\
+ 	FN(trace_printk),		\
+ 	FN(get_prandom_u32),		\
+diff --git a/src/cc/export/helpers.h b/src/cc/export/helpers.h
+index 9c39dfd0..0e5f86f5 100644
+--- a/src/cc/export/helpers.h
++++ b/src/cc/export/helpers.h
+@@ -276,6 +276,8 @@ static int (*bpf_map_delete_elem)(void *map, void *key) =
+   (void *) BPF_FUNC_map_delete_elem;
+ static int (*bpf_probe_read)(void *dst, u64 size, const void *unsafe_ptr) =
+   (void *) BPF_FUNC_probe_read;
++static int (*bpf_probe_read_stack)(void *dst, u64 size, const void *unsafe_ptr) =
++  (void *) BPF_FUNC_probe_read_stack;
+ static u64 (*bpf_ktime_get_ns)(void) =
+   (void *) BPF_FUNC_ktime_get_ns;
+ static u32 (*bpf_get_prandom_u32)(void) =
+diff --git a/src/cc/libbpf b/src/cc/libbpf
+--- a/src/cc/libbpf
++++ b/src/cc/libbpf
+@@ -1 +1 @@
+-Subproject commit 910c475f09e5c269f441d7496c27dace30dc2335
++Subproject commit 910c475f09e5c269f441d7496c27dace30dc2335-dirty

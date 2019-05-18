@@ -1,0 +1,69 @@
+diff --git a/include/uapi/linux/bpf.h b/include/uapi/linux/bpf.h
+index 000f5ce..dc0e74d 100644
+--- a/include/uapi/linux/bpf.h
++++ b/include/uapi/linux/bpf.h
+@@ -376,6 +376,9 @@ struct xdp_md {
+  * int bpf_probe_read(void *dst, int size, void *src)
+  *     Return: 0 on success or negative error
+  *
++ * int bpf_probe_read_stack(void *dst, int size, void *src)
++ *     Return: rem on success or negative error
++ *
+  * u64 bpf_ktime_get_ns(void)
+  *     Return: current ktime
+  *
+@@ -550,6 +553,7 @@ struct xdp_md {
+ 	FN(map_update_elem),		\
+ 	FN(map_delete_elem),		\
+ 	FN(probe_read),			\
++	FN(probe_read_stack),		\
+ 	FN(ktime_get_ns),		\
+ 	FN(trace_printk),		\
+ 	FN(get_prandom_u32),		\
+diff --git a/kernel/trace/bpf_trace.c b/kernel/trace/bpf_trace.c
+index 98b7c00..0aec238 100644
+--- a/kernel/trace/bpf_trace.c
++++ b/kernel/trace/bpf_trace.c
+@@ -96,6 +96,33 @@ static const struct bpf_func_proto bpf_probe_read_proto = {
+ 	.arg3_type	= ARG_ANYTHING,
+ };
+ 
++BPF_CALL_3(bpf_probe_read_stack, void *, dst, u32, size, const void *, unsafe_ptr)
++{
++	long ret;
++	mm_segment_t old_fs = get_fs();
++
++	set_fs(KERNEL_DS);
++	pagefault_disable();
++	ret = __copy_from_user_inatomic(dst,
++			(__force const void __user *)unsafe_ptr, size);
++	pagefault_enable();
++	set_fs(old_fs);
++
++	if (unlikely(ret < 0))
++		memset(dst, 0, size);
++
++	return ret;
++}
++
++static const struct bpf_func_proto bpf_probe_read_stack_proto = {
++	.func		= bpf_probe_read_stack,
++	.gpl_only	= true,
++	.ret_type	= RET_INTEGER,
++	.arg1_type	= ARG_PTR_TO_UNINIT_MEM,
++	.arg2_type	= ARG_CONST_SIZE_OR_ZERO,
++	.arg3_type	= ARG_ANYTHING,
++};
++
+ BPF_CALL_3(bpf_probe_write_user, void *, unsafe_ptr, const void *, src,
+ 	   u32, size)
+ {
+@@ -481,6 +508,8 @@ tracing_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
+ 		return &bpf_get_prandom_u32_proto;
+ 	case BPF_FUNC_probe_read_str:
+ 		return &bpf_probe_read_str_proto;
++	case BPF_FUNC_probe_read_stack:
++		return &bpf_probe_read_stack_proto;
+ 	default:
+ 		return NULL;
+ 	}
