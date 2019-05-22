@@ -1,7 +1,7 @@
 /*
   Red Black Trees
   (C) 1999  Andrea Arcangeli <andrea@suse.de>
-  
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation; either version 2 of the License, or
@@ -26,12 +26,12 @@
   See Documentation/rbtree.txt for documentation and samples.
 */
 
-#ifndef	_LINUX_RBTREE_H
-#define	_LINUX_RBTREE_H
+#ifndef __RBTREE_H
+#define __RBTREE_H
 
 #include "utility.h"
-#include <stdlib.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 struct rb_node {
 	unsigned long  __rb_parent_color;
@@ -52,7 +52,7 @@ struct rb_root {
 
 #define RB_EMPTY_ROOT(root)  ((root)->rb_node == NULL)
 
-/* 'empty' nodes are nodes that are known not to be inserted in an rbree */
+/* 'empty' nodes are nodes that are known not to be inserted in an rbtree */
 #define RB_EMPTY_NODE(node)  \
 	((node)->__rb_parent_color == (unsigned long)(node))
 #define RB_CLEAR_NODE(node)  \
@@ -74,11 +74,11 @@ extern struct rb_node *rb_first_postorder(const struct rb_root *);
 extern struct rb_node *rb_next_postorder(const struct rb_node *);
 
 /* Fast replacement of a single node without remove/rebalance/add/rebalance */
-extern void rb_replace_node(struct rb_node *victim, struct rb_node *new, 
+extern void rb_replace_node(struct rb_node *victim, struct rb_node *new,
 			    struct rb_root *root);
 
-static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
-				struct rb_node ** rb_link)
+static inline void rb_link_node(struct rb_node *node, struct rb_node *parent,
+				struct rb_node **rb_link)
 {
 	node->__rb_parent_color = (unsigned long)parent;
 	node->rb_left = node->rb_right = NULL;
@@ -91,19 +91,15 @@ static inline void rb_link_node(struct rb_node * node, struct rb_node * parent,
 	   ____ptr ? rb_entry(____ptr, type, member) : NULL; \
 	})
 
-/**
- * rbtree_postorder_for_each_entry_safe - iterate over rb_root in post order of
- * given type safe against removal of rb_node entry
- *
- * @pos:	the 'type *' to use as a loop cursor.
- * @n:		another 'type *' to use as temporary storage
- * @root:	'rb_root *' of the rbtree.
- * @field:	the name of the rb_node field within 'type'.
- */
-#define rbtree_postorder_for_each_entry_safe(pos, n, root, field) \
-	for (pos = rb_entry_safe(rb_first_postorder(root), typeof(*pos), field); \
-	     pos && ({ n = rb_entry_safe(rb_next_postorder(&pos->field), \
-			typeof(*pos), field); 1; }); \
-	     pos = n)
 
-#endif	/* _LINUX_RBTREE_H */
+/*
+ * Handy for checking that we are not deleting an entry that is
+ * already in a list, found in block/{blk-throttle,cfq-iosched}.c,
+ * probably should be moved to lib/rbtree.c...
+ */
+static inline void rb_erase_init(struct rb_node *n, struct rb_root *root)
+{
+	rb_erase(n, root);
+	RB_CLEAR_NODE(n);
+}
+#endif /* __PERF_RBTREE_H */

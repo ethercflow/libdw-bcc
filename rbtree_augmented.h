@@ -18,17 +18,17 @@
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
+  tools/linux/include/linux/rbtree_augmented.h
+
+  Copied from:
   linux/include/linux/rbtree_augmented.h
 */
 
-#ifndef _LINUX_RBTREE_AUGMENTED_H
-#define _LINUX_RBTREE_AUGMENTED_H
+#ifndef _TOOLS_LINUX_RBTREE_AUGMENTED_H
+#define _TOOLS_LINUX_RBTREE_AUGMENTED_H
 
-#define __always_inline inline __attribute__((always_inline))
-#define true 1
-#define false 0
-
-#include "rbtree.h"
+#include <linux/compiler.h>
+#include <linux/rbtree.h>
 
 /*
  * Please note - only struct rb_augment_callbacks and the prototypes for
@@ -242,4 +242,4 @@ rb_erase_augmented(struct rb_node *node, struct rb_root *root,
 		__rb_erase_color(rebalance, root, augment->rotate);
 }
 
-#endif	/* _LINUX_RBTREE_AUGMENTED_H */
+#endif	/* _TOOLS_LINUX_RBTREE_AUGMENTED_H */
