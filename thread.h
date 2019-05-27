@@ -13,11 +13,6 @@ struct maps;
 struct machine;
 struct unwind_libunwind_ops;
 
-struct thread_leader {
-     struct rb_root entries;
-     struct list_head node;
-};
-
 struct thread {
      union {
           struct rb_node rb_node;
