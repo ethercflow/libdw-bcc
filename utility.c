@@ -1,5 +1,8 @@
+#include "utility.h"
 #include <stdlib.h>
 #include <assert.h>
+
+bool singlethreaded = true;
 
 void *xmalloc(size_t size)
 {
