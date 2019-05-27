@@ -80,4 +80,7 @@ static inline unsigned long long rdclock(void)
 #define ALIGN(x, a)	__ALIGN_MASK(x, (typeof(x))(a)-1)
 #define __ALIGN_MASK(x, mask)	(((x)+(mask))&~(mask))
 
+int path__join(char *bf, size_t size, const char *path1, const char *path2);
+bool is_regular_file(const char *file);
+
 #endif // __UTILITY_H__
