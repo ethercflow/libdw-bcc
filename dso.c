@@ -2,17 +2,28 @@
 #include "map.h"
 #include "list.h"
 #include "rbtree.h"
+#include "symbol.h"
 #include "utility.h"
 #include <string.h>
 #include <pthread.h>
 #include <libgen.h>
-#include <sys/stat.h>
 #include <assert.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
 
+static LIST_HEAD(dso__data_open);
+static long dso__data_open_cnt;
 static pthread_mutex_t dso__data_open_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static void dso__list_add(struct dso *dso)
+{
+     list_add_tail(&dso->data.open_entry, &dso__data_open);
+     dso__data_open_cnt++;
+}
 /*
  * Find a matching entry and/or link current entry to RB tree.
  * Either one of the dso or name parameter must be non-NULL or the
@@ -147,8 +158,13 @@ struct dso *dso__new(const char *name)
      strcpy(dso->name, name);
      dso__set_long_name(dso, dso->name, false);
      dso__set_short_name(dso, dso->name, false);
+     dso->data.cache = RB_ROOT;
      dso->data.fd = -1;
      dso->data.status = DSO_DATA_STATUS_UNKNOWN;
+     RB_CLEAR_NODE(&dso->rb_node);
+     dso->root = NULL;
+     INIT_LIST_HEAD(&dso->node);
+     INIT_LIST_HEAD(&dso->data.open_entry);
      pthread_mutex_init(&dso->lock, NULL);
      refcount_set(&dso->refcnt, 1);
 
@@ -173,8 +189,74 @@ void dso__put(struct dso *dso)
           dso__delete(dso);
 }
 
-static void try_to_open_dso(struct dso *dso, struct machine *machine)
+void dso__read_binary_type_filename(const struct dso *dso, char *filename, size_t size)
 {
+     __symbol__join_symfs(filename, size, dso->long_name);
+}
+
+static int do_open(char *name)
+{
+     int fd;
+
+     fd = open(name, O_RDONLY);
+     if (fd >= 0)
+          return fd;
+
+     /* FIXME: not thread-safe */
+     fprintf(stderr, "dso open failed: %s\n", strerror(errno));
+
+     assert(0);
+
+     return -1;
+}
+
+static int __open_dso(struct dso *dso)
+{
+     int fd = -EINVAL;
+     char *name = malloc(PATH_MAX);
+
+     if (!name)
+          return -ENOMEM;
+
+     dso__read_binary_type_filename(dso, name, PATH_MAX);
+
+     assert(!is_regular_file(name));
+
+     fd = do_open(name);
+
+     free(name);
+     return fd;
+}
+
+/**
+ * dso_close - Open DSO data file
+ * @dso: dso object
+ *
+ * Open @dso's data file descriptor and updates
+ * list/count of open DSO objects.
+ */
+static int open_dso(struct dso *dso)
+{
+     int fd = __open_dso(dso);
+
+     if (fd >= 0)
+          dso__list_add(dso);
+
+     return fd;
+}
+
+static void try_to_open_dso(struct dso *dso)
+{
+
+     if (dso->data.fd >= 0)
+          return;
+
+     dso->data.fd = open_dso(dso);
+
+     if (dso->data.fd >= 0)
+          dso->data.status = DSO_DATA_STATUS_OK;
+     else
+          dso->data.status = DSO_DATA_STATUS_ERROR;
 }
 
 /**
@@ -186,7 +268,7 @@ static void try_to_open_dso(struct dso *dso, struct machine *machine)
  * returns file descriptor.  It should be paired with
  * dso__data_put_fd() if it returns non-negative value.
  */
-int dso__data_get_fd(struct dso *dso, struct machine *machine)
+int dso__data_get_fd(struct dso *dso, struct machine *machine __maybe_unused)
 {
      if (dso->data.status == DSO_DATA_STATUS_ERROR)
           return -1;
@@ -194,7 +276,7 @@ int dso__data_get_fd(struct dso *dso, struct machine *machine)
      if (pthread_mutex_lock(&dso__data_open_lock) < 0)
           return -1;
 
-     try_to_open_dso(dso, machine);
+     try_to_open_dso(dso);
 
      if (dso->data.fd < 0)
           pthread_mutex_unlock(&dso__data_open_lock);
@@ -278,8 +360,7 @@ dso_cache__memcpy(struct dso_cache *cache, u64 offset,
 }
 
 static ssize_t
-dso_cache__read(struct dso *dso, struct machine *machine,
-                u64 offset, u8 *data, ssize_t size)
+dso_cache__read(struct dso *dso, u64 offset, u8 *data, ssize_t size)
 {
      struct dso_cache *cache;
      struct dso_cache *old;
@@ -298,7 +379,7 @@ dso_cache__read(struct dso *dso, struct machine *machine,
            * dso->data.fd might be closed if other thread opened another
            * file (dso) due to open file limit (RLIMIT_NOFILE).
            */
-          try_to_open_dso(dso, machine);
+          try_to_open_dso(dso);
 
           if (dso->data.fd < 0) {
                ret = -errno;
@@ -335,8 +416,8 @@ dso_cache__read(struct dso *dso, struct machine *machine,
      return ret;
 }
 
-static ssize_t dso_cache_read(struct dso *dso, struct machine *machine,
-                              u64 offset, u8 *data, ssize_t size)
+static ssize_t
+dso_cache_read(struct dso *dso, u64 offset, u8 *data, ssize_t size)
 {
      struct dso_cache *cache;
 
@@ -344,7 +425,7 @@ static ssize_t dso_cache_read(struct dso *dso, struct machine *machine,
      if (cache)
           return dso_cache__memcpy(cache, offset, data, size);
      else
-          return dso_cache__read(dso, machine, offset, data, size);
+          return dso_cache__read(dso, offset, data, size);
 }
 
 /*
@@ -352,8 +433,7 @@ static ssize_t dso_cache_read(struct dso *dso, struct machine *machine,
  * in the rb_tree. Any read to already cached data is served
  * by cached data.
  */
-static ssize_t cached_read(struct dso *dso, struct machine *machine,
-                           u64 offset, u8 *data, ssize_t size)
+static ssize_t cached_read(struct dso *dso, u64 offset, u8 *data, ssize_t size)
 {
      ssize_t r = 0;
      u8 *p = data;
@@ -361,7 +441,7 @@ static ssize_t cached_read(struct dso *dso, struct machine *machine,
      do {
           ssize_t ret;
 
-          ret = dso_cache_read(dso, machine, offset, p, size);
+          ret = dso_cache_read(dso, offset, p, size);
           if (ret < 0)
                return ret;
 
@@ -381,7 +461,7 @@ static ssize_t cached_read(struct dso *dso, struct machine *machine,
      return r;
 }
 
-static int data_file_size(struct dso *dso, struct machine *machine)
+static int data_file_size(struct dso *dso)
 {
      int ret = 0;
      struct stat st;
@@ -398,7 +478,7 @@ static int data_file_size(struct dso *dso, struct machine *machine)
       * dso->data.fd might be closed if other thread opened another
       * file (dso) due to open file limit (RLIMIT_NOFILE).
       */
-     try_to_open_dso(dso, machine);
+     try_to_open_dso(dso);
 
      if (dso->data.fd < 0) {
           ret = -errno;
@@ -420,10 +500,10 @@ out:
      return ret;
 }
 
-static ssize_t data_read_offset(struct dso *dso, struct machine *machine,
-                                u64 offset, u8 *data, ssize_t size)
+static ssize_t
+data_read_offset(struct dso *dso, u64 offset, u8 *data, ssize_t size)
 {
-     if (data_file_size(dso, machine))
+     if (data_file_size(dso))
           return -1;
 
      /* Check the offset sanity. */
@@ -433,7 +513,7 @@ static ssize_t data_read_offset(struct dso *dso, struct machine *machine,
      if (offset + size < offset)
           return -1;
 
-     return cached_read(dso, machine, offset, data, size);
+     return cached_read(dso, offset, data, size);
 }
 
 /**
@@ -447,13 +527,14 @@ static ssize_t data_read_offset(struct dso *dso, struct machine *machine,
  * External interface to read data from dso file offset. Open
  * dso data file and use cached_read to get the data.
  */
-ssize_t dso__data_read_offset(struct dso *dso, struct machine *machine,
+ssize_t dso__data_read_offset(struct dso *dso,
+                              struct machine *machine __maybe_unused,
                               u64 offset, u8 *data, ssize_t size)
 {
      if (dso->data.status == DSO_DATA_STATUS_ERROR)
           return -1;
 
-     return data_read_offset(dso, machine, offset, data, size);
+     return data_read_offset(dso,offset, data, size);
 }
 
 /**
