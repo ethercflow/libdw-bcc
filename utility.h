@@ -21,6 +21,12 @@ void *xcalloc(size_t nmemb, size_t size);
 
 #define swap(x, y) ({ typeof(x) __tmp = (x); (x) = (y); (y) = __tmp; })
 
+#define min(x, y) ({				\
+	typeof(x) _min1 = (x);			\
+	typeof(y) _min2 = (y);			\
+	(void) (&_min1 == &_min2);		\
+	_min1 < _min2 ? _min1 : _min2; })
+
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
