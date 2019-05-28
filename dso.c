@@ -378,6 +378,7 @@ dso_cache__read(struct dso *dso, u64 offset, u8 *data, ssize_t size)
           /*
            * dso->data.fd might be closed if other thread opened another
            * file (dso) due to open file limit (RLIMIT_NOFILE).
+           * FIXME: support close file because of RLIMIT_NOFILE
            */
           try_to_open_dso(dso);
 

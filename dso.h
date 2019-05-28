@@ -38,6 +38,14 @@ struct dsos {
 };
 
 struct dso *dsos__findnew(struct dsos *dsos, const char *name);
+struct dso *__dsos__find(struct dsos *dsos,
+                         const char *name,
+                         bool cmp_short);
+struct dso *dsos__find(struct dsos *dsos,
+                       const char *name,
+                       bool cmp_short);
+struct dso *__dsos__addnew(struct dsos *dsos,
+                           const char *name);
 
 struct dso {
     pthread_mutex_t lock;
@@ -71,14 +79,6 @@ struct dso *dso_new(const char *name);
 void dso_delete(struct dso *dso);
 struct dso *dso__get(struct dso *dso);
 void dso__put(struct dso *dso);
-struct dso *__dsos__find(struct dsos *dsos,
-                         const char *name,
-                         bool cmp_short);
-struct dso *dsos__find(struct dsos *dsos,
-                       const char *name,
-                       bool cmp_short);
-struct dso *__dsos__addnew(struct dsos *dsos,
-                           const char *name);
 
 static inline void __dso__zput(struct dso **dso)
 {
