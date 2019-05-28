@@ -21,7 +21,7 @@ struct machine;
 
 struct stacktrace {
     int depth;
-    u64 *ip;
+    u64 *ips;
 };
 
 struct unwind_ctx {
