@@ -13,6 +13,9 @@
 #include <string.h>
 #include <gelf.h>
 
+#undef debug
+#define debug(args...) ""
+
 extern int
 UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
                                     unw_word_t ip,
@@ -576,8 +579,9 @@ int unwind_prepare_access(struct thread *thread, struct map *map,
                           bool *initialized)
 {
      if (thread->addr_space) {
-          fprintf(stderr, "thread map already set, dso=%s\n",
-                  map->dso->name);
+          if (!map)
+               debug("thread map already set, dso=%s, thread=%p\n",
+                     map->dso->name, thread);
           if (initialized)
                *initialized = true;
           return 0;
