@@ -146,5 +146,8 @@ int bpf_unwind_ctx__resolve_callchain(struct stacktrace *st,
     thread = machine__findnew_thread(machine, uc->tgid, uc->tid);
     assert(thread != NULL);
 
+    if (!thread->addr_space)
+        unwind_prepare_access(thread, NULL, NULL);
+
     return unwind_get_entries(NULL, NULL, thread, uc, st);
 }
