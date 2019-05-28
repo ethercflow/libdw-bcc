@@ -84,7 +84,7 @@ static inline struct maps *maps__get(struct maps *maps)
 }
 
 void maps__put(struct maps *maps);
-bool maps_empty(struct maps *maps);
+bool maps__empty(struct maps *maps);
 
 struct map *maps__first(struct maps *maps);
 

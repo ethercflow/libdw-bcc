@@ -113,7 +113,7 @@ void maps__put(struct maps *maps)
 		maps__delete(maps);
 }
 
-bool maps_empty(struct maps *maps)
+bool maps__empty(struct maps *maps)
 {
 	if (maps__first(maps))
 		return false;
@@ -127,7 +127,7 @@ void maps__delete(struct maps *maps)
 	free(maps);
 }
 
-struct map *maps_first(struct maps *maps)
+struct map *maps__first(struct maps *maps)
 {
 	struct rb_node *first = rb_first(&maps->entries);
 

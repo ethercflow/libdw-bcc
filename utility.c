@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/stat.h>
+#include <stdarg.h>
 
 bool singlethreaded = true;
 

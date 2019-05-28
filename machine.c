@@ -60,9 +60,9 @@ static void machine__update_thread_tgid(struct machine *machine,
         return;
 
     if (th->maps) {
-        if (!maps_empty(th->maps))
+        if (!maps__empty(th->maps))
             assert(0);
-        maps_put(th->maps);
+        maps__put(th->maps);
     }
 
     th->maps = maps__get(leader->maps);

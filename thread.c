@@ -5,14 +5,12 @@
 #include <string.h>
 #include <assert.h>
 
-struct thread *thread_new(pid_t tgid, pid_t tid, const char *name)
+struct thread *thread__new(pid_t tgid, pid_t tid)
 {
      struct thread *thread = xcalloc(sizeof(*thread), 1);
 
      thread->tgid = tgid;
      thread->tid = tid;
-
-     snprintf(thread->name, TASK_COMM_LEN, "%s", name);
 
      refcount_set(&thread->refcnt, 1);
      RB_CLEAR_NODE(&thread->rb_node);
@@ -20,7 +18,7 @@ struct thread *thread_new(pid_t tgid, pid_t tid, const char *name)
      return thread;
 }
 
-void thread_delete(struct thread *thread)
+void thread__delete(struct thread *thread)
 {
      assert(RB_EMPTY_NODE(&thread->rb_node));
 

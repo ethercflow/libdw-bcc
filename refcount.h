@@ -1,7 +1,7 @@
 #ifndef __REFCOUNT_H_
 #define __REFCOUNT_H_
 
-#include <stdatomic.h>
+#include "stdatomic.h"
 #include <stdbool.h>
 
 typedef struct refcount_struct {
