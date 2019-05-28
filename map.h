@@ -88,4 +88,6 @@ bool maps__empty(struct maps *maps);
 
 struct map *maps__first(struct maps *maps);
 
+void maps__insert(struct maps *maps, struct map *map);
+
 #endif // __MAP_H_
