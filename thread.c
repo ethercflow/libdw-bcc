@@ -2,6 +2,7 @@
 #include "thread.h"
 #include "machine.h"
 #include "utime.h"
+#include "unwind.h"
 #include <string.h>
 #include <assert.h>
 
@@ -59,4 +60,18 @@ int thread__init_maps(struct thread *thread, struct machine *machine)
      }
 
      return thread->maps ? 0 : -1;
+}
+
+int thread__insert_map(struct thread *thread, struct map *map)
+{
+     int ret;
+
+     ret = unwind_prepare_access(thread, map, NULL);
+     if (ret)
+          return ret;
+
+     /* TODO: handle overlapping maps? */
+     maps__insert(thread->maps, map);
+
+     return 0;
 }
