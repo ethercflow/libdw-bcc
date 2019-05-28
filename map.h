@@ -87,7 +87,7 @@ void maps__put(struct maps *maps);
 bool maps__empty(struct maps *maps);
 
 struct map *maps__first(struct maps *maps);
-
+struct map *maps__find(struct maps *maps, u64 ip);
 void maps__insert(struct maps *maps, struct map *map);
 
 #endif // __MAP_H_
