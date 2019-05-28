@@ -21,20 +21,4 @@ struct mmap2_event {
     char filename[PATH_MAX];
 };
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-int bpf_unwind_ctx__comm_event(struct machine *machine, struct unwind_ctx *uc);
-int bpf_unwind_ctx__mmap_event(struct mmap2_event *event,
-                               struct machine *machine,
-                               struct unwind_ctx *uc,
-                               bool mmap_data);
-int bpf_unwind_ctx__process_mmap_event(struct machine *machine,
-                                       struct mmap2_event *event,
-                                       struct unwind_ctx *uc);
-#ifdef __cplusplus
-}
-#endif
-
 #endif // __EVENT_H_

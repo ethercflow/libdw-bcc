@@ -1,34 +1,47 @@
 #include "map.h"
-#include "event.h"
 #include "thread.h"
 #include "machine.h"
 #include "utility.h"
-#include "unwind_ctx.h"
+#include "event.h"
+#include "libdw_bcc.h"
+#include "unwind.h"
 #include <assert.h>
 #include <sys/mman.h>
 #include <string.h>
 #include <inttypes.h>
 
-int bpf_unwind_ctx_preprocess(struct machine *machine, struct unwind_ctx *uc)
-{
-    struct thread *thread = machine__findnew_thread(machine, uc->tgid, uc->tid);
+typedef int (*event__handler_t)(struct machine *machine,
+                                struct mmap2_event *event);
 
-    // TODO: set thread comm
-    //
+static int bpf_unwind_ctx__process_mmap(struct machine *machine,
+                                       struct mmap2_event *event)
+{
+    struct thread *thread;
+    struct map *map;
+
+    thread = machine__findnew_thread(machine, event->tgid, event->tid);
+    assert(thread != NULL);
+
+    map = map__new(machine, thread, event);
+
+    assert(!thread__insert_map(thread, map));
     thread__put(thread);
+    map__put(map);
 
     return 0;
 }
 
-int bpf_unwind_ctx__mmap_event(struct mmap2_event *event, struct machine *machine, struct unwind_ctx *uc, bool mmap_data)
+static int bpf_unwind_ctx_prepare_mmap(struct machine *machine,
+                                       struct mmap2_event *event,
+                                       pid_t tgid, pid_t tid,
+                                       event__handler_t process)
 {
     char filename[PATH_MAX];
     FILE *fp;
     unsigned long long t;
     int rc = 0;
 
-
-    snprintf(filename, sizeof(filename), "/proc/%d/task/%d/maps", uc->tgid, uc->tgid);
+    snprintf(filename, sizeof(filename), "/proc/%d/task/%d/maps", tgid, tgid);
 
     fp = fopen(filename, "r");
     if (fp == NULL) {
@@ -87,7 +100,7 @@ int bpf_unwind_ctx__mmap_event(struct mmap2_event *event, struct machine *machin
             event->flags |= MAP_PRIVATE;
 
         if (prot[2] != 'x') {
-            if (!mmap_data || prot[0] != 'r')
+            if (prot[0] != 'r')
                 continue;
         }
 
@@ -98,37 +111,40 @@ int bpf_unwind_ctx__mmap_event(struct mmap2_event *event, struct machine *machin
         memcpy(event->filename, execname, size);
         size = ALIGN(size, sizeof(u64));
         event->len -= event->start;
-        event->tgid = uc->tgid;
-        event->tid = uc->tid;
+        event->tgid = tgid;
+        event->tid = tid;
+
+        process(machine, event);
     }
 
     fprintf(stderr, "handle map_event cost: %llu\n", rdclock() - t);
 
     fclose(fp);
+
     return rc;
 }
 
-int bpf_unwind_ctx__process_mmap_event(struct machine *machine,
-                                       struct mmap2_event *event,
-                                       struct unwind_ctx *uc)
+int bpf_unwind_ctx__thread_map(struct machine *machine, pid_t tgid, pid_t tid)
+{
+    struct mmap2_event *event;
+    int ret = 0;
+
+    event = xmalloc(sizeof(*event));
+    ret = bpf_unwind_ctx_prepare_mmap(machine, event, tgid, tid,
+                                      bpf_unwind_ctx__process_mmap);
+    free(event);
+
+    return ret;
+}
+
+int bpf_unwind_ctx__resolve_callchain(struct stacktrace *st,
+                                      struct machine *machine,
+                                      struct unwind_ctx *uc)
 {
     struct thread *thread;
-    struct map *map;
 
-    thread = machine__findnew_thread(machine, event->tgid, event->tid);
-    assert(!thread);
+    thread = machine__findnew_thread(machine, uc->tgid, uc->tid);
+    assert(thread != NULL);
 
-    map = map__new(machine, thread, event);
-
-//     map = map__new(machine, event->start,
-//                    event->len, event->pgoff,
-//                    event->tgid, event->maj,
-//                    event->min, event->ino,
-//                    event->ino_generation,
-//                    event->prot,
-//                    event->flags,
-//                    event->filename,
-//                    thread);
-
-
+    return unwind_get_entries(NULL, NULL, thread, uc, st);
 }
