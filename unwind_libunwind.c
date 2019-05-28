@@ -179,9 +179,12 @@ static u64 elf_section_offset(int fd, const char *name)
      return offset;
 }
 
-static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
+static inline struct map *find_map(unw_word_t ip, struct unwind_info *ui)
 {
-    
+     struct map *map = maps__find(ui->thread->maps, ip);
+     /* TODO: maybe need to handle dlopen's so here */
+     assert(map != NULL);
+     return map;
 }
 
 static int unwind_spec_ehframe(struct dso *dso, struct machine *machine,
@@ -243,7 +246,7 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
      u64 table_data, segbase, fde_count;
      int ret = -EINVAL;
 
-     map = find_map(ip, ui);  // TODO: think about find_newmap for dlopen?
+     map = find_map(ip, ui);
      if (!map || !map->dso)
           return -EINVAL;
 
