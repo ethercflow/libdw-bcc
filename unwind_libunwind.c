@@ -5,7 +5,7 @@
 #include "utility.h"
 #include "dso.h"
 #include "map.h"
-#include "unwind_ctx.h"
+#include "libdw_bcc.h"
 #include <libunwind.h>
 #include <libunwind-x86_64.h>
 #include <errno.h>
@@ -32,6 +32,7 @@ UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
 #define DW_EH_PE_udata8         0x04    /* unsigned 64-bit value */
 #define DW_EH_PE_sdata4         0x0b    /* signed 32-bit value */
 #define DW_EH_PE_sdata8         0x0c    /* signed 64-bit value */
+
 
 /* Pointer-encoding application: */
 #define DW_EH_PE_absptr         0x00    /* absolute value */
@@ -415,7 +416,8 @@ static void _finish_access(struct thread *thread)
 
 static int _get_entries(unwind_entry_cb_t cb, void *arg,
                         struct thread *thread,
-                        struct unwind_ctx *data, int max_stack)
+                        struct unwind_ctx *data,
+                        struct stacktrace *st)
 {
      return 0;
 }
@@ -527,9 +529,10 @@ void unwind_finish_access(struct thread *thread)
 
 int unwind_get_entries(unwind_entry_cb_t cb, void *arg,
                        struct thread *thread,
-                       struct unwind_ctx *data, int max_stack)
+                       struct unwind_ctx *data,
+                       struct stacktrace *st)
 {
      if (thread->ulops)
-          return thread->ulops->get_entries(cb, arg, thread, data, max_stack);
+          return thread->ulops->get_entries(cb, arg, thread, data, st);
      return 0;
 }

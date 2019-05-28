@@ -8,6 +8,7 @@ struct map;
 struct symbol;
 struct thread;
 struct unwind_ctx;
+struct stacktrace;
 
 struct unwind_entry {
 	struct map	*map;
@@ -23,12 +24,14 @@ struct unwind_libunwind_ops {
 	void (*finish_access)(struct thread *thread);
 	int (*get_entries)(unwind_entry_cb_t cb, void *arg,
 					   struct thread *thread,
-					   struct unwind_ctx *data, int max_stack);
+					   struct unwind_ctx *data,
+					   struct stacktrace *st);
 };
 
 int unwind_get_entries(unwind_entry_cb_t cb, void *arg,
 					   struct thread *thread,
-					   struct unwind_ctx *data, int max_stack);
+					   struct unwind_ctx *data,
+					   struct stacktrace *st);
 
 #ifndef LIBUNWIND__ARCH_REG_SP
 # define LIBUNWIND__ARCH_REG_SP    X86_SP
