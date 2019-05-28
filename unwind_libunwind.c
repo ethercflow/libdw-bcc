@@ -417,12 +417,82 @@ static void _finish_access(struct thread *thread)
      unw_destroy_addr_space(thread->addr_space);
 }
 
-static int _get_entries(unwind_entry_cb_t cb, void *arg,
+static void display_error(int err)
+{
+     switch (err) {
+          case UNW_EINVAL:
+               fprintf(stderr, "unwind: Only supports local.\n");
+               break;
+          case UNW_EUNSPEC:
+               fprintf(stderr, "unwind: Unspecified error.\n");
+               break;
+          case UNW_EBADREG:
+               fprintf(stderr, "unwind: Register unavailable.\n");
+               break;
+          default:
+               break;
+     }
+}
+
+static int get_entries(struct unwind_info *ui,
+                       unwind_entry_cb_t cb __maybe_unused,
+                       void *arg __maybe_unused,
+                       struct stacktrace *st)
+{
+     unw_addr_space_t addr_space;
+     unw_cursor_t c;
+     u64 val;
+     int ret, i = 0;
+
+     if (!st || !st->ips || st->depth < 1) {
+          fprintf(stderr, "stacktrace not init\n");
+          return EINVAL;
+     }
+
+     val = reg_value(&ui->uc->uregs, LIBUNWIND__ARCH_REG_SP);
+     st->ips[i++] = val;
+
+     addr_space = ui->thread->addr_space;
+     if (!addr_space)
+          return -1;
+
+     ret = unw_init_remote(&c, addr_space, ui);
+     if (ret)
+          display_error(ret);
+
+     while (!ret && (unw_step(&c) > 0) && i < st->depth) {
+          unw_get_reg(&c, UNW_REG_IP, &st->ips[i]);
+
+          /*
+           * Decrement the IP for any non-activation frames.
+           * this is required to properly find the srcline
+           * for caller frames.
+           * See also the documentation for dwfl_frame_pc(),
+           * which this code tries to replicate.
+           */
+          if (unw_is_signal_frame(&c) <= 0)
+               --st->ips[i];
+
+          ++i;
+     }
+
+     st->depth = i;
+
+     return ret;
+}
+
+static int _get_entries(unwind_entry_cb_t cb,
+                        void *arg,
                         struct thread *thread,
-                        struct unwind_ctx *data,
+                        struct unwind_ctx *uc,
                         struct stacktrace *st)
 {
-     return 0;
+     struct unwind_info ui = {
+         .uc = uc,
+         .machine = thread->maps->machine,
+         .thread = thread,
+     };
+     return get_entries(&ui, cb, arg, st);
 }
 
 static struct unwind_libunwind_ops unwind_libunwind_ops = {
