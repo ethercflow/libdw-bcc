@@ -120,6 +120,13 @@ void machine__delete(struct machine *machine)
     }
 }
 
+struct machine *machine__new(void)
+{
+    struct machine *machine = xmalloc(sizeof(*machine));
+    machine__init(machine);
+    return machine;
+}
+
 void machine__init(struct machine *machine)
 {
     memset(machine, 0, sizeof(*machine));
