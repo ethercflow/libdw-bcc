@@ -1,40 +1,15 @@
-cmake_minimum_required(VERSION 3.13)
-project(libdw_bcc C)
+cmake_minimum_required(VERSION 2.8.7)
+project(libdw_bcc)
 
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_FLAGS "-g")
+include(cmake/GetGitRevisionDescription.cmake)
+include(cmake/version.cmake)
+include(CMakeDependentOption)
+include(GNUInstallDirs)
+include(CheckCXXCompilerFlag)
+include(cmake/FindCompilerFlag.cmake)
 
-include_directories(.)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-add_library(dw_bcc SHARED
-        libdw_bcc.h
-        dso.c
-        dso.h
-        event.c
-        event.h
-        list.h
-        machine.c
-        machine.h
-        map.c
-        map.h
-        ptrace.h
-        queue.h
-        rbtree.c
-        rbtree.h
-        rbtree_augmented.h
-        refcount.h
-        rwsem.c
-        rwsem.h
-        symbol.h
-        symbol_elf.c
-        thread.c
-        thread.h
-        types.h
-        unwind.h
-        unwind_libunwind.c
-        utility.c
-        utility.h)
-
-set(api_headers libdw_bcc.h ptrace.h types.h)
-install(TARGETS dw_bcc LIBRARY DESTINATION lib64/)
-install(FILES ${api_headers} DESTINATION include/)
+add_subdirectory(src)
+add_subdirectory(examples)
+add_subdirectory(tests)

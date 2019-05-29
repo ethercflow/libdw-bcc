@@ -75,7 +75,7 @@ static inline struct dso *__dso__find_by_longname(struct rb_root *root,
      return __dso__findlink_by_longname(root, NULL, name);
 }
 
-void dso__set_long_name(struct dso *dso, const char *name, bool name_allocated)
+static void dso__set_long_name(struct dso *dso, const char *name, bool name_allocated)
 {
      struct rb_root *root = dso->root;
 
@@ -103,7 +103,7 @@ void dso__set_long_name(struct dso *dso, const char *name, bool name_allocated)
           __dso__findlink_by_longname(root, dso, NULL);
 }
 
-void dso__set_short_name(struct dso *dso, const char *name, bool name_allocated)
+static void dso__set_short_name(struct dso *dso, const char *name, bool name_allocated)
 {
      if (name == NULL)
           return;
@@ -142,7 +142,7 @@ static void dso__set_basename(struct dso *dso)
        dso__set_short_name(dso, base, true);
 }
 
-struct dso *dso__new(const char *name)
+static struct dso *dso__new(const char *name)
 {
      struct dso *dso = xcalloc(1, sizeof(*dso) + strlen(name) + 1);
 
@@ -161,7 +161,7 @@ struct dso *dso__new(const char *name)
      return dso;
 }
 
-void dso__delete(struct dso *dso)
+static void dso__delete(struct dso *dso)
 {
 
 }
@@ -179,7 +179,7 @@ void dso__put(struct dso *dso)
           dso__delete(dso);
 }
 
-void dso__read_binary_type_filename(const struct dso *dso, char *filename, size_t size)
+static void dso__read_binary_type_filename(const struct dso *dso, char *filename, size_t size)
 {
      __symbol__join_symfs(filename, size, dso->long_name);
 }
@@ -518,7 +518,7 @@ ssize_t dso__data_read_addr(struct dso *dso, struct map *map,
      return dso__data_read_offset(dso, machine, offset, data, size);
 }
 
-void __dsos__add(struct dsos *dsos, struct dso *dso)
+static void __dsos__add(struct dsos *dsos, struct dso *dso)
 {
      list_add_tail(&dso->node, &dsos->head);
      __dso__findlink_by_longname(&dsos->root, dso, NULL);
@@ -545,7 +545,7 @@ void __dsos__add(struct dsos *dsos, struct dso *dso)
      dso__get(dso);
 }
 
-void dsos__add(struct dsos *dsos, struct dso *dso)
+static void dsos__add(struct dsos *dsos, struct dso *dso)
 {
      down_write(&dsos->lock);
      __dsos__add(dsos, dso);

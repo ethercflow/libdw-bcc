@@ -1,5 +1,6 @@
 #include "machine.h"
 #include "thread.h"
+#include "libdw_bcc.h"
 #include "map.h"
 #include "rbtree.h"
 #include <string.h>
@@ -83,7 +84,7 @@ static void __machine__remove_thread(struct machine *machine, struct thread *th,
      thread__put(th);
 }
 
-void machine__delete_threads(struct machine *machine)
+static void machine__delete_threads(struct machine *machine)
 {
      struct rb_node *nd;
      int i;
@@ -102,7 +103,7 @@ void machine__delete_threads(struct machine *machine)
      }
 }
 
-void machine__exit(struct machine *machine)
+static void machine__exit(struct machine *machine)
 {
     int i;
 
@@ -120,6 +121,7 @@ void machine__exit(struct machine *machine)
 void machine__delete(struct machine *machine)
 {
     if (machine) {
+        machine__delete_threads(machine);
         machine__exit(machine);
         free(machine);
     }
