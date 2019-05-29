@@ -6,6 +6,11 @@
 #include <string.h>
 #include <assert.h>
 
+#ifdef debug
+#undef debug
+#define debug(args...)    ""
+#endif
+
 struct thread *thread__new(pid_t tgid, pid_t tid)
 {
      struct thread *thread = xcalloc(sizeof(*thread), 1);
@@ -36,6 +41,9 @@ struct thread *thread__get(struct thread *thread)
 {
      if (thread)
           refcount_inc(&thread->refcnt);
+     debug("inc thread %d:%d's ref to: %d\n",
+           thread->tgid, thread->tid,
+           refcount_read(&thread->refcnt));
      return thread;
 }
 
@@ -49,6 +57,9 @@ void thread__put(struct thread *thread)
           list_del_init(&thread->node);
           thread__delete(thread);
      }
+     debug("dec thread %d:%d's ref to: %d\n",
+           thread->tgid, thread->tid,
+           refcount_read(&thread->refcnt));
 }
 
 int thread__init_maps(struct thread *thread, struct machine *machine)

@@ -10,8 +10,10 @@
 #include <string.h>
 #include <inttypes.h>
 
+#ifdef debug
 #undef debug
 #define debug(args...)    ""
+#endif
 
 typedef int (*event__handler_t)(struct machine *machine,
                                 struct mmap2_event *event);
@@ -22,6 +24,8 @@ static int bpf_unwind_ctx__process_mmap(struct machine *machine,
     struct thread *thread;
     struct map *map;
 
+    debug("bpf_unwind_ctx_process_map, tgid: %d, tid: %d\n",
+          event->tgid, event->tid);
     thread = machine__findnew_thread(machine, event->tgid, event->tid);
     assert(thread != NULL);
 

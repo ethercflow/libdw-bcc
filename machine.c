@@ -5,6 +5,11 @@
 #include <string.h>
 #include <assert.h>
 
+#ifdef debug
+#undef debug
+#define debug(args...)    ""
+#endif
+
 static void dsos__init(struct dsos *dsos)
 {
     INIT_LIST_HEAD(&dsos->head);
@@ -221,6 +226,7 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
         return NULL;
 
     th = thread__new(tgid, tid);
+    debug("____machine__findnew_thread, tgid: %d, tid: %d\n", tgid, tid);
     if (th != NULL) {
         rb_link_node(&th->rb_node, parent, p);
         rb_insert_color(&th->rb_node, &threads->entries);
@@ -234,6 +240,7 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
          * leader and that would screwed the rb tree.
          */
         if (thread__init_maps(th, machine)) {
+            debug("clear thread\n");
             rb_erase_init(&th->rb_node, &threads->entries);
             RB_CLEAR_NODE(&th->rb_node);
             thread__put(th);
@@ -267,7 +274,7 @@ machine__findnew_thread(struct machine *machine, pid_t tgid, pid_t tid)
     th = __machine__findnew_thread(machine, tgid, tid);
     up_write(&threads->lock);
 
-    return NULL;
+    return th;
 }
 
 struct dso *machine__findnew_dso(struct machine *machine, const char *fname)
