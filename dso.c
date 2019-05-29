@@ -15,15 +15,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-static LIST_HEAD(dso__data_open);
-static long dso__data_open_cnt;
-static pthread_mutex_t dso__data_open_lock = PTHREAD_MUTEX_INITIALIZER;
-
-static void dso__list_add(struct dso *dso)
-{
-     list_add_tail(&dso->data.open_entry, &dso__data_open);
-     dso__data_open_cnt++;
-}
 /*
  * Find a matching entry and/or link current entry to RB tree.
  * Either one of the dso or name parameter must be non-NULL or the
@@ -164,7 +155,6 @@ struct dso *dso__new(const char *name)
      RB_CLEAR_NODE(&dso->rb_node);
      dso->root = NULL;
      INIT_LIST_HEAD(&dso->node);
-     INIT_LIST_HEAD(&dso->data.open_entry);
      pthread_mutex_init(&dso->lock, NULL);
      refcount_set(&dso->refcnt, 1);
 
@@ -210,24 +200,6 @@ static int do_open(char *name)
      return -1;
 }
 
-static int __open_dso(struct dso *dso)
-{
-     int fd = -EINVAL;
-     char *name = malloc(PATH_MAX);
-
-     if (!name)
-          return -ENOMEM;
-
-     dso__read_binary_type_filename(dso, name, PATH_MAX);
-
-     assert(!is_regular_file(name));
-
-     fd = do_open(name);
-
-     free(name);
-     return fd;
-}
-
 /**
  * dso_close - Open DSO data file
  * @dso: dso object
@@ -237,17 +209,21 @@ static int __open_dso(struct dso *dso)
  */
 static int open_dso(struct dso *dso)
 {
-     int fd = __open_dso(dso);
+     int fd = -EINVAL;
+     char *name = xmalloc(PATH_MAX);
 
-     if (fd >= 0)
-          dso__list_add(dso);
+     dso__read_binary_type_filename(dso, name, PATH_MAX);
 
+     assert(is_regular_file(name));
+
+     fd = do_open(name);
+
+     free(name);
      return fd;
 }
 
 static void try_to_open_dso(struct dso *dso)
 {
-
      if (dso->data.fd >= 0)
           return;
 
@@ -273,20 +249,13 @@ int dso__data_get_fd(struct dso *dso, struct machine *machine __maybe_unused)
      if (dso->data.status == DSO_DATA_STATUS_ERROR)
           return -1;
 
-     if (pthread_mutex_lock(&dso__data_open_lock) < 0)
-          return -1;
-
      try_to_open_dso(dso);
-
-     if (dso->data.fd < 0)
-          pthread_mutex_unlock(&dso__data_open_lock);
 
      return dso->data.fd;
 }
 
 void dso__data_put_fd(struct dso *dso __maybe_unused)
 {
-     pthread_mutex_unlock(&dso__data_open_lock);
 }
 
 static struct dso_cache *dso_cache__find(struct dso *dso, u64 offset)
@@ -373,12 +342,10 @@ dso_cache__read(struct dso *dso, u64 offset, u8 *data, ssize_t size)
           if (!cache)
                return -ENOMEM;
 
-          pthread_mutex_lock(&dso__data_open_lock);
-
           /*
            * dso->data.fd might be closed if other thread opened another
            * file (dso) due to open file limit (RLIMIT_NOFILE).
-           * FIXME: support close file because of RLIMIT_NOFILE
+           * TODO: support close file because of RLIMIT_NOFILE
            */
           try_to_open_dso(dso);
 
@@ -397,8 +364,6 @@ dso_cache__read(struct dso *dso, u64 offset, u8 *data, ssize_t size)
           cache->offset = cache_offset;
           cache->size   = ret;
      } while (0);
-
-     pthread_mutex_unlock(&dso__data_open_lock);
 
      if (ret > 0) {
           old = dso_cache__insert(dso, cache);
@@ -473,8 +438,6 @@ static int data_file_size(struct dso *dso)
      if (dso->data.status == DSO_DATA_STATUS_ERROR)
           return -1;
 
-     pthread_mutex_lock(&dso__data_open_lock);
-
      /*
       * dso->data.fd might be closed if other thread opened another
       * file (dso) due to open file limit (RLIMIT_NOFILE).
@@ -497,7 +460,6 @@ static int data_file_size(struct dso *dso)
      dso->data.file_size = st.st_size;
 
 out:
-     pthread_mutex_unlock(&dso__data_open_lock);
      return ret;
 }
 

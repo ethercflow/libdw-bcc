@@ -59,7 +59,6 @@ struct dso {
         int fd;
         int status;
         size_t file_size;
-        struct list_head open_entry;
         u64 eh_frame_hdr_offset;
     } data;
 
