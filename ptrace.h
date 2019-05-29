@@ -2,8 +2,10 @@
 #define __PTRACE_H_
 
 #include "types.h"
-#include "utility.h"
 #include <assert.h>
+#include <stddef.h>
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof(*(x)))
 
 struct pt_regs {
 /*

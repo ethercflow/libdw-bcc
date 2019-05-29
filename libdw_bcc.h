@@ -3,7 +3,6 @@
 
 #include "types.h"
 #include "ptrace.h"
-#include "machine.h"
 #include <sys/types.h>
 
 #ifdef __cplusplus

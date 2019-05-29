@@ -34,6 +34,6 @@ add_library(libdw_bcc SHARED
         utility.c
         utility.h)
 
-set(api_headers libdw_bcc.h machine.h)
+set(api_headers libdw_bcc.h ptrace.h types.h)
 install(TARGETS libdw_bcc LIBRARY DESTINATION lib64/)
 install(FILES ${api_headers} DESTINATION include/)
