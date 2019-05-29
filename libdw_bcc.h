@@ -3,6 +3,7 @@
 
 #include "types.h"
 #include "ptrace.h"
+#include "machine.h"
 #include <sys/types.h>
 
 #ifdef __cplusplus
@@ -17,7 +18,7 @@ extern "C" {
 # define STACK_SIZE       4096 * 2
 #endif
 
-struct machine;
+typedef struct machine machine_t;
 
 struct stacktrace {
     int depth;
@@ -36,10 +37,13 @@ struct unwind_ctx {
     char data[STACK_SIZE];
 };
 
-int bpf_unwind_ctx__thread_map(struct machine *machine, pid_t tgid, pid_t tid);
+machine_t *machine__new(void);
+int bpf_unwind_ctx__thread_map(machine_t *machine, pid_t tgid, pid_t tid);
 int bpf_unwind_ctx__resolve_callchain(struct stacktrace *st,
-                                      struct machine *machine,
+                                      machine_t *machine,
                                       struct unwind_ctx *uc);
+void machine__delete_threads(machine_t *machine);
+void machine__exit(machine_t *machine);
 
 #ifdef __cplusplus
 }
