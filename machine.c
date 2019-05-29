@@ -12,6 +12,28 @@ static void dsos__init(struct dsos *dsos)
     init_rwsem(&dsos->lock);
 }
 
+static void dsos__purge(struct dsos *dsos)
+{
+    struct dso *pos, *n;
+
+    down_write(&dsos->lock);
+
+    list_for_each_entry_safe(pos, n, &dsos->head, node) {
+        RB_CLEAR_NODE(&pos->rb_node);
+        pos->root = NULL;
+        list_del_init(&pos->node);
+        dso__put(pos);
+    }
+
+    up_write(&dsos->lock);
+}
+
+static void dsos__exit(struct dsos *dsos)
+{
+    dsos__purge(dsos);
+    exit_rwsem(&dsos->lock);
+}
+
 static void machine__threads_init(struct machine *machine)
 {
     for (int i = 0; i < THREADS__TABLE_SIZE; i++) {
@@ -24,13 +46,34 @@ static void machine__threads_init(struct machine *machine)
     }
 }
 
-int machine__init(struct machine *machine)
+void machine__exit(struct machine *machine)
+{
+    int i;
+
+    if (machine == NULL)
+        return;
+
+    dsos__exit(&machine->dsos);
+
+    for (i = 0; i < THREADS__TABLE_SIZE; i++) {
+        struct threads *threads = &machine->threads[i];
+        exit_rwsem(&threads->lock);
+    }
+}
+
+void machine__delete(struct machine *machine)
+{
+    if (machine) {
+        machine__exit(machine);
+        free(machine);
+    }
+}
+
+void machine__init(struct machine *machine)
 {
     memset(machine, 0, sizeof(*machine));
     dsos__init(&machine->dsos);
     machine__threads_init(machine);
-
-    return 0;
 }
 
 static void machine__update_thread_tgid(struct machine *machine,

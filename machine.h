@@ -22,7 +22,7 @@ struct machine {
     struct dsos dsos;
 };
 
-int machine__init(struct machine *machine);
+void machine__init(struct machine *machine);
 
 struct thread *
 __machine__findnew_thread(struct machine *machine, pid_t pid, pid_t tid);
