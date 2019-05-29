@@ -23,6 +23,12 @@ void thread__delete(struct thread *thread)
 {
      assert(RB_EMPTY_NODE(&thread->rb_node));
 
+     if (thread->maps) {
+          maps__put(thread->maps);
+          thread->maps = NULL;
+     }
+
+     unwind_finish_access(thread);
      free(thread);
 }
 
