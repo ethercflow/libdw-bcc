@@ -46,6 +46,57 @@ static void machine__threads_init(struct machine *machine)
     }
 }
 
+static inline
+struct threads *machine__threads(struct machine *machine, pid_t tid)
+{
+    /* Cast it to handle tid == -1 */
+    return &machine->threads[(unsigned int)tid % THREADS__TABLE_SIZE];
+}
+
+static void __machine__remove_thread(struct machine *machine, struct thread *th,
+                                     bool lock)
+{
+     struct threads *threads = machine__threads(machine, th->tid);
+
+     if (threads->last_match == th)
+          threads->last_match = NULL;
+
+     assert(refcount_read(&th->refcnt) != 0);
+     if (lock)
+          down_write(&threads->lock);
+     rb_erase_init(&th->rb_node, &threads->entries);
+     RB_CLEAR_NODE(&th->rb_node);
+     --threads->nr;
+     /*
+      * Move it first to the dead_threads list, then drop the reference,
+      * if this is the last reference, then the thread__delete destructor
+      * will be called and we will remove it from the dead_threads list.
+      */
+     list_add_tail(&th->node, &threads->dead);
+     if (lock)
+          up_write(&threads->lock);
+     thread__put(th);
+}
+
+void machine__delete_threads(struct machine *machine)
+{
+     struct rb_node *nd;
+     int i;
+
+     for (i = 0; i < THREADS__TABLE_SIZE; i++) {
+          struct threads *threads = &machine->threads[i];
+          down_write(&threads->lock);
+          nd = rb_first(&threads->entries);
+          while (nd) {
+               struct thread *t = rb_entry(nd, struct thread, rb_node);
+
+               nd = rb_next(nd);
+               __machine__remove_thread(machine, t, false);
+          }
+          up_write(&threads->lock);
+     }
+}
+
 void machine__exit(struct machine *machine)
 {
     int i;
@@ -192,15 +243,11 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
     return th;
 }
 
-static inline struct threads *machine__threads(struct machine *machine, pid_t tid)
+struct thread *__machine__findnew_thread(struct machine *machine,
+                                         pid_t tgid, pid_t tid)
 {
-    /* Cast it to handle tid == -1 */
-    return &machine->threads[(unsigned int)tid % THREADS__TABLE_SIZE];
-}
-
-struct thread *__machine__findnew_thread(struct machine *machine, pid_t tgid, pid_t tid)
-{
-    return ____machine__findnew_thread(machine, machine__threads(machine, tid), tgid, tid, true);
+    return ____machine__findnew_thread(machine, machine__threads(machine, tid),
+                                       tgid, tid, true);
 }
 
 struct thread *
