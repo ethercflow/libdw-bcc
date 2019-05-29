@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 
 include_directories(.)
 
-add_library(libdw_bcc SHARED
+add_library(dw_bcc SHARED
         libdw_bcc.h
         dso.c
         dso.h
@@ -35,5 +35,5 @@ add_library(libdw_bcc SHARED
         utility.h)
 
 set(api_headers libdw_bcc.h ptrace.h types.h)
-install(TARGETS libdw_bcc LIBRARY DESTINATION lib64/)
+install(TARGETS dw_bcc LIBRARY DESTINATION lib64/)
 install(FILES ${api_headers} DESTINATION include/)
