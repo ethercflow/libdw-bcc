@@ -34,5 +34,6 @@ struct thread *thread__get(struct thread *thread);
 void thread__put(struct thread *thread);
 int thread__init_maps(struct thread *thread, struct machine *machine);
 int thread__insert_map(struct thread *thread, struct map *map);
+void thread__set_comm(struct thread *thread, const char *str);
 
 #endif // __THREAD_H_

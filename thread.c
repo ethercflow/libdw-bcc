@@ -28,7 +28,7 @@ void thread__delete(struct thread *thread)
           thread->maps = NULL;
      }
 
-     unwind_finish_access(thread);
+     unwind__finish_access(thread);
      free(thread);
 }
 
@@ -73,7 +73,7 @@ int thread__insert_map(struct thread *thread, struct map *map)
      int ret;
 
      /* TODO: Is there a better place? */
-     ret = unwind_prepare_access(thread, map, NULL);
+     ret = unwind__prepare_access(thread, map, NULL);
      if (ret)
           return ret;
 
@@ -81,4 +81,12 @@ int thread__insert_map(struct thread *thread, struct map *map)
      maps__insert(thread->maps, map);
 
      return 0;
+}
+
+void thread__set_comm(struct thread *thread, const char *str)
+{
+     if (!strncmp(str, thread->name, TASK_COMM_LEN)) {
+          strncpy(thread->name, str, TASK_COMM_LEN);
+          unwind__flush_access(thread);
+     }
 }
