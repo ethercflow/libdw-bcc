@@ -46,10 +46,13 @@ void *xcalloc(size_t nmemb, size_t size);
 # define __must_check __attribute__((warn_unused_result))
 #endif
 
+#ifndef __refcount_check
+# define __refcount_check	__must_check
+#endif
+
 #ifndef __packed
 # define __packed __attribute__((packed))
 #endif
-
 
 #define __AC(X,Y)	(X##Y)
 #define _AC(X,Y)	__AC(X,Y)
