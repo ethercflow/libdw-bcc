@@ -575,7 +575,7 @@ static inline void unwind_register_ops(struct thread *thread,
      thread->ulops = ops;
 }
 
-int unwind_prepare_access(struct thread *thread, struct map *map,
+int unwind__prepare_access(struct thread *thread, struct map *map,
                           bool *initialized)
 {
      if (thread->addr_space) {
@@ -592,19 +592,19 @@ int unwind_prepare_access(struct thread *thread, struct map *map,
      return 0;
 }
 
-void unwind_flush_access(struct thread *thread)
+void unwind__flush_access(struct thread *thread)
 {
      if (thread->ulops)
           thread->ulops->flush_access(thread);
 }
 
-void unwind_finish_access(struct thread *thread)
+void unwind__finish_access(struct thread *thread)
 {
      if (thread->ulops)
           thread->ulops->finish_access(thread);
 }
 
-int unwind_get_entries(unwind_entry_cb_t cb, void *arg,
+int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
                        struct thread *thread,
                        struct unwind_ctx *data,
                        struct stacktrace *st)

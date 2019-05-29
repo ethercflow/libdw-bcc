@@ -150,7 +150,8 @@ int bpf_unwind_ctx__resolve_callchain(struct stacktrace *st,
     assert(thread != NULL);
 
     if (!thread->addr_space)
-        unwind_prepare_access(thread, NULL, NULL);
+        unwind__prepare_access(thread, NULL, NULL);
+    thread__set_comm(thread, uc->name);
 
-    return unwind_get_entries(NULL, NULL, thread, uc, st);
+    return unwind__get_entries(NULL, NULL, thread, uc, st);
 }

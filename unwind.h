@@ -28,7 +28,7 @@ struct unwind_libunwind_ops {
 					   struct stacktrace *st);
 };
 
-int unwind_get_entries(unwind_entry_cb_t cb, void *arg,
+int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 					   struct thread *thread,
 					   struct unwind_ctx *data,
 					   struct stacktrace *st);
@@ -38,9 +38,9 @@ int unwind_get_entries(unwind_entry_cb_t cb, void *arg,
 #endif
 
 int LIBUNWIND__ARCH_REG_ID(int regnum);
-int unwind_prepare_access(struct thread *thread, struct map *map,
+int unwind__prepare_access(struct thread *thread, struct map *map,
 						  bool *initialized);
-void unwind_flush_access(struct thread *thread);
-void unwind_finish_access(struct thread *thread);
+void unwind__flush_access(struct thread *thread);
+void unwind__finish_access(struct thread *thread);
 
 #endif /* _UNWIND_H */
