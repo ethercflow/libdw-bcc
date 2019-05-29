@@ -10,6 +10,9 @@
 #include <string.h>
 #include <inttypes.h>
 
+#undef debug
+#define debug(args...)    ""
+
 typedef int (*event__handler_t)(struct machine *machine,
                                 struct mmap2_event *event);
 
@@ -117,7 +120,7 @@ static int bpf_unwind_ctx_prepare_mmap(struct machine *machine,
         process(machine, event);
     }
 
-    fprintf(stderr, "handle map_event cost: %llu\n", rdclock() - t);
+    debug("handle map_event cost: %llu\n", rdclock() - t);
 
     fclose(fp);
 

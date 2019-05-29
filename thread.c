@@ -66,6 +66,7 @@ int thread__insert_map(struct thread *thread, struct map *map)
 {
      int ret;
 
+     /* TODO: Is there a better place? */
      ret = unwind_prepare_access(thread, map, NULL);
      if (ret)
           return ret;
