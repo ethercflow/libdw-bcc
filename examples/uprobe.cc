@@ -1,4 +1,5 @@
 #include "queue.h"
+#include "stoppable.h"
 #include <bcc/BPF.h>
 #include <iostream>
 #include <fstream>
@@ -116,86 +117,83 @@ int probe_func_entry(void *ctx)
 typedef uint64_t    unw_word_t;
 
 static ebpf::BPF *bpf;
+static int maxdepth = 4;
 
 static void unwind_ctx_handler(void *cb_cookie,
                                void *raw,
                                int raw_size __maybe_unused) {
     auto uc = static_cast<unwind_ctx*>(raw);
     auto q = static_cast<Queue<unwind_ctx>*>(cb_cookie);
-#if 0
-    std::cout << std::dec << "TIME: " << uc->ts
-              << " TGID: " << uc->tgid << " TID: " << uc->tid
-              << " (" << uc->name << ")" << " read stack size: "
-              << uc->size << " sp: 0x" << std::hex << uc->uregs.sp
-              << std::endl;
-#endif
     q->push(*uc);
 }
 
-static void signal_handler(int s) {
-    std::cerr << "Terminating..." << std::endl;
-    delete bpf;
-    exit(0);
-}
-
-static void kevent_poll(void) {
-    while (true) {
-        bpf->poll_perf_buffer("unwind_ctxs");
-    }
-}
-
-static int maxdepth = 4;
-
-static void resolve_callchain(Queue<unwind_ctx>& q, pid_t tgid, pid_t tid)
-{
-    machine_t *machine = machine__new();
-    auto ret = bpf_unwind_ctx__thread_map(machine, tgid, tid);
-    if (ret) {
-        std::cerr << "thread_map failed: " << ret << std::endl;
-    }
-    struct stacktrace st;
-    st.depth = maxdepth;
-    st.ips = reinterpret_cast<u64*>(calloc(sizeof(u64*), st.depth));
-
-    do {
-        auto uc = q.pop();
-        auto ret = bpf_unwind_ctx__resolve_callchain(&st, machine, &uc);
-        if (ret) {
-            std::cerr << "resolve_callchain failed: " << ret << std::endl;
-            exit(1);
-        }
-#if 0
-        std::cout << "uc.size: " << uc.size << std::endl;
-        for (int i = 0; i < st.depth; i++) {
-            std::cout << "ip: 0x" << std::hex  << st.ips[i] << std::endl;
-        }
-        std::string fname = std::to_string(uc.tgid) + "-"
-            + std::to_string(uc.tgid) + "-" + std::to_string(uc.ts)
-            + "-stack.txt";
-        std::ofstream sf(fname, std::ios_base::app);
-        auto p = reinterpret_cast<unw_word_t*>(uc.data);
-        for (int i = 0; i < uc.size / 8; i++) {
-            sf << std::hex << *p << std::endl;
-            ++p;
-        }
-        sf.close();
-#endif
-        bcc_symbol symbol;
-        bcc_symbol_option symbol_option = {
-            .use_debug_file = 1,
-            .check_debug_file_crc = 1,
-            .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
-        };
-        void *cache = bcc_symcache_new(tgid, &symbol_option);
-        for (int i = 0; i < st.depth; i++) {
-            if (bcc_symcache_resolve(cache, st.ips[i], &symbol) != 0) {
-                std::cout << "[UNKNOWN]" << std::endl;
-            } else {
-                std::cout << symbol.demangle_name << std::endl;
-                bcc_symbol_free_demangle_name(&symbol);
+class EventPollTask: public Stoppable {
+    public:
+        void run() {
+            while (stopRequested() == false) {
+                bpf->poll_perf_buffer("unwind_ctxs");
             }
         }
-    } while (true);
+};
+
+class ResolveCallchainTask: public Stoppable {
+    public:
+        void init(pid_t _tgid, pid_t _tid, Queue<unwind_ctx> *_q) {
+            tgid = _tgid;
+            tid = _tid;
+            q = _q;
+        }
+        void run() {
+            machine_t *machine = machine__new();
+            auto ret = bpf_unwind_ctx__thread_map(machine, tgid, tid);
+            if (ret) {
+                std::cerr << "thread_map failed: " << ret << std::endl;
+            }
+
+            struct stacktrace st;
+            st.depth = maxdepth;
+            st.ips = reinterpret_cast<u64*>(calloc(sizeof(u64*), st.depth));
+
+            while (stopRequested() == false) {
+                auto uc = q->pop();
+                auto ret = bpf_unwind_ctx__resolve_callchain(&st, machine, &uc);
+                if (ret) {
+                    std::cerr << "resolve_callchain failed: " << ret << std::endl;
+                    exit(1);
+                }
+
+                bcc_symbol symbol;
+                bcc_symbol_option symbol_option = {
+                    .use_debug_file = 1,
+                    .check_debug_file_crc = 1,
+                    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+                };
+                void *cache = bcc_symcache_new(tgid, &symbol_option);
+                for (int i = 0; i < st.depth; i++) {
+                    if (bcc_symcache_resolve(cache, st.ips[i], &symbol) != 0) {
+                        std::cout << "[UNKNOWN]" << std::endl;
+                    } else {
+                        std::cout << symbol.demangle_name << std::endl;
+                        bcc_symbol_free_demangle_name(&symbol);
+                    }
+                }
+            }
+
+            machine__delete(machine);
+        }
+    private:
+        pid_t tgid;
+        pid_t tid;
+        Queue<unwind_ctx> *q;
+};
+
+EventPollTask ept;
+ResolveCallchainTask rct;
+
+static void signal_handler(int s) {
+    std::cerr << "Terminating..." << std::endl;
+    ept.stop();
+    rct.stop();
 }
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
@@ -234,8 +232,13 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     signal(SIGINT, signal_handler);
     std::cout << "Started tracing, hit Ctrl-C to terminate." << std::endl;
 
-    std::thread t1(kevent_poll);
-    std::thread t2(std::bind(resolve_callchain, std::ref(q), tgid, tid));
+    std::thread t1([&]() {
+        ept.run();
+    });
+    std::thread t2([&]() {
+        rct.init(tgid, tid, &q);
+        rct.run();
+    });
     t1.join();
     t2.join();
 
