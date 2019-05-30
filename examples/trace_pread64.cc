@@ -3,6 +3,8 @@
 #include <fstream>
 #include <cinttypes>
 #include <csignal>
+#include <thread>
+#include <libdw_bcc.h>
 
 std::string BPF_PROGRAM = R"(
 #include <linux/sched.h>
@@ -95,7 +97,7 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         return 0;
 }
 
-int on_sys_clone(void *ctx)
+int on_sys_pread64(void *ctx)
 {
         if (get_unwind_ctx(ctx) < 0)
                 bpf_trace_printk("get_unwind_ctx failed\n");
@@ -108,59 +110,9 @@ int on_sys_clone(void *ctx)
 # define __maybe_unused __attribute__((unused))
 #endif
 
-#define TASK_COMM_LEN    16
-#define STACK_SIZE       4096 * 2
-
-typedef uint64_t    u64;
-typedef uint32_t    u32;
 typedef uint64_t    unw_word_t;
 
-struct pt_regs {
-/*
- * C ABI says these regs are callee-preserved. They aren't saved on kernel entry
- * unless syscall needs a complete, fully filled "struct pt_regs".
- */
-    unsigned long r15;
-    unsigned long r14;
-    unsigned long r13;
-    unsigned long r12;
-    unsigned long bp;
-    unsigned long bx;
-/* These regs are callee-clobbered. Always saved on kernel entry. */
-    unsigned long r11;
-    unsigned long r10;
-    unsigned long r9;
-    unsigned long r8;
-    unsigned long ax;
-    unsigned long cx;
-    unsigned long dx;
-    unsigned long si;
-    unsigned long di;
-/*
- * On syscall entry, this is syscall#. On CPU exception, this is error code.
- * On hw interrupt, it's IRQ number:
- */
-    unsigned long orig_ax;
-/* Return frame for iretq */
-    unsigned long ip;
-    unsigned long cs;
-    unsigned long flags;
-    unsigned long sp;
-    unsigned long ss;
-/* top of stack page */
-};
-
-struct unwind_ctx {
-    u64 ts;
-    u32 tid;
-    u32 tgid;
-
-    struct pt_regs uregs;
-    char name[TASK_COMM_LEN];
-
-    int size;
-    char data[STACK_SIZE];
-};
+static ebpf::BPF *bpf;
 
 static void unwind_ctx_handler(void *cb_cookie __maybe_unused,
                                void *raw,
@@ -183,15 +135,28 @@ static void unwind_ctx_handler(void *cb_cookie __maybe_unused,
     sf.close();
 }
 
-static ebpf::BPF *bpf;
-
 static void signal_handler(int s) {
     std::cerr << "Terminating..." << std::endl;
     delete bpf;
     exit(0);
 }
 
+static void kevent_poll(void) {
+    while (true) {
+        bpf->poll_perf_buffer("unwind_ctxs");
+    }
+}
+
+static void resolve_callchain(pid_t tgid, pid_t tid)
+{
+    machine_t *machine = machine__new();
+    bpf_unwind_ctx__thread_map(machine, tgid, tid);
+
+}
+
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
+    pid_t tgid(std::stoi(argv[1]));
+    pid_t tid(std::stoi(argv[2]));
     bpf = new ebpf::BPF(0, nullptr, true, "", true);
     auto init_res = bpf->init(BPF_PROGRAM);
     if (init_res.code() != 0) {
@@ -199,8 +164,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         return 1;
     }
 
-    std::string clone_fnname = bpf->get_syscall_fnname("clone");
-    auto attach_res = bpf->attach_kprobe(clone_fnname, "on_sys_clone");
+    std::string syscall_fnname = bpf->get_syscall_fnname("pread64");
+    auto attach_res = bpf->attach_kprobe(syscall_fnname, "on_sys_pread64");
     if (attach_res.code() != 0) {
         std::cerr << attach_res.msg() << std::endl;
         return 1;
@@ -220,9 +185,11 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
 
     signal(SIGINT, signal_handler);
     std::cout << "Started tracing, hit Ctrl-C to terminate." << std::endl;
-    while (true) {
-        bpf->poll_perf_buffer("unwind_ctxs");
-    }
+
+    std::thread t1(kevent_poll);
+    std::thread t2(resolve_callchain, tgid, tid);
+    t1.join();
+    t2.join();
 
     return 0;
 }
