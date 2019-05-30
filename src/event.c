@@ -31,6 +31,7 @@ static int bpf_unwind_ctx__process_mmap(struct machine *machine,
 
     map = map__new(machine, thread, event);
 
+    debug("process_mmap, insert new map: %s\n", event->filename);
     assert(!thread__insert_map(thread, map));
     thread__put(thread);
     map__put(map);
@@ -106,10 +107,8 @@ static int bpf_unwind_ctx_prepare_mmap(struct machine *machine,
         else
             event->flags |= MAP_PRIVATE;
 
-        if (prot[2] != 'x') {
-            if (prot[0] != 'r')
+        if (prot[2] != 'x')
                 continue;
-        }
 
         if (!strcmp(execname, ""))
             strcpy(execname, anonstr);
