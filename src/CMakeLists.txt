@@ -19,6 +19,6 @@ set_target_properties(dw_bcc-shared PROPERTIES OUTPUT_NAME dw_bcc)
 
 set(dw_bcc_api_headers libdw_bcc.h ptrace.h types.h)
 
-install(TARGETS dw_bcc-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(FILES ${dw_bcc_api_headers} DESTINATION include/bcc)
+install(TARGETS dw_bcc-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/dw_bcc)
+install(FILES ${dw_bcc_api_headers} DESTINATION include/dw_bcc)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libdw_bcc.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
