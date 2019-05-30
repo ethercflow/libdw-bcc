@@ -144,6 +144,8 @@ static void kevent_poll(void) {
     }
 }
 
+static int maxdepth = 4;
+
 static void resolve_callchain(Queue<unwind_ctx>& q, pid_t tgid, pid_t tid)
 {
     machine_t *machine = machine__new();
@@ -152,7 +154,7 @@ static void resolve_callchain(Queue<unwind_ctx>& q, pid_t tgid, pid_t tid)
         std::cerr << "thread_map failed: " << ret << std::endl;
     }
     struct stacktrace st;
-    st.depth = 4;
+    st.depth = maxdepth;
     st.ips = reinterpret_cast<u64*>(calloc(sizeof(u64*), st.depth));
 
     do {
@@ -201,6 +203,8 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     pid_t tid(std::stoi(argv[2]));
     std::string bin_path(argv[3]);
     std::string probe_func(argv[4]);
+    if (argv[5])
+        maxdepth = std::stoi(argv[5]);
     bpf = new ebpf::BPF(0, nullptr, true, "", true);
     auto init_res = bpf->init(BPF_PROGRAM);
     if (init_res.code() != 0) {
