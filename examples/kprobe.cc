@@ -1,3 +1,4 @@
+#include "queue.h"
 #include <bcc/BPF.h>
 #include <iostream>
 #include <fstream>
@@ -5,6 +6,7 @@
 #include <csignal>
 #include <thread>
 #include <libdw_bcc.h>
+#include <cstdlib>
 
 std::string BPF_PROGRAM = R"(
 #include <linux/sched.h>
@@ -54,7 +56,7 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
                 user_regs = ctx;
         } else {
                 if (task->mm)
-                        user_regs = ((struct pt_regs *)(task)->thread.sp0 - 1);
+                     user_regs = ((struct pt_regs *)(task)->thread.sp0 - 1);
         }
 
         if (!user_regs)
@@ -114,25 +116,18 @@ typedef uint64_t    unw_word_t;
 
 static ebpf::BPF *bpf;
 
-static void unwind_ctx_handler(void *cb_cookie __maybe_unused,
+static void unwind_ctx_handler(void *cb_cookie,
                                void *raw,
                                int raw_size __maybe_unused) {
     auto uc = static_cast<unwind_ctx*>(raw);
-    std::cout << std::dec << "TIME: " << uc->ts
-              << " TGID: " << uc->tgid << " TID: " << uc->tid
-              << " (" << uc->name << ")" << " read stack size: "
-              << uc->size << " sp: 0x" << std::hex << uc->uregs.sp
-              << std::endl;
-    std::string fname = std::to_string(uc->tgid) + "-"
-        + std::to_string(uc->tgid) + "-" + std::to_string(uc->ts)
-        + "-stack.txt";
-    std::ofstream sf(fname, std::ios_base::app);
-    auto p = reinterpret_cast<unw_word_t*>(uc->data);
-    for (int i = 0; i < uc->size / 8; i++) {
-        sf << std::hex << *p << std::endl;
-        ++p;
-    }
-    sf.close();
+    auto q = static_cast<Queue<unwind_ctx>*>(cb_cookie);
+    // std::cout << std::dec << "TIME: " << uc->ts
+    //           << " TGID: " << uc->tgid << " TID: " << uc->tid
+    //           << " (" << uc->name << ")" << " read stack size: "
+    //           << uc->size << " sp: 0x" << std::hex << uc->uregs.sp
+    //           << std::endl;
+    if (uc->tgid == 91042)
+        q->push(*uc);
 }
 
 static void signal_handler(int s) {
@@ -147,11 +142,40 @@ static void kevent_poll(void) {
     }
 }
 
-static void resolve_callchain(pid_t tgid, pid_t tid)
+static void resolve_callchain(Queue<unwind_ctx>& q, pid_t tgid, pid_t tid)
 {
     machine_t *machine = machine__new();
-    bpf_unwind_ctx__thread_map(machine, tgid, tid);
+    auto ret = bpf_unwind_ctx__thread_map(machine, tgid, tid);
+    if (ret) {
+        std::cerr << "thread_map failed: " << ret << std::endl;
+    }
+    struct stacktrace st;
+    st.depth = 4;
+    st.ips = reinterpret_cast<u64*>(calloc(sizeof(u64*), st.depth));
 
+    do {
+        auto uc = q.pop();
+        std::cout << "uc.size: " << uc.size << std::endl;
+        auto ret = bpf_unwind_ctx__resolve_callchain(&st, machine, &uc);
+        if (ret) {
+            std::cerr << "resolve_callchain failed: " << ret << std::endl;
+            exit(1);
+        }
+        for (int i = 0; i < st.depth; i++) {
+            std::cout << "ip: 0x" << std::hex  << st.ips[i] << std::endl;
+        }
+
+        std::string fname = std::to_string(uc.tgid) + "-"
+            + std::to_string(uc.tgid) + "-" + std::to_string(uc.ts)
+            + "-stack.txt";
+        std::ofstream sf(fname, std::ios_base::app);
+        auto p = reinterpret_cast<unw_word_t*>(uc.data);
+        for (int i = 0; i < uc.size / 8; i++) {
+            sf << std::hex << *p << std::endl;
+            ++p;
+        }
+        sf.close();
+    } while (false);
 }
 
 int main(int argc __maybe_unused, char **argv __maybe_unused) {
@@ -171,8 +195,9 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
         return 1;
     }
 
+    Queue<unwind_ctx> q;
     auto open_res = bpf->open_perf_buffer("unwind_ctxs", &unwind_ctx_handler,
-                                          nullptr, nullptr, 64);
+                                          nullptr, reinterpret_cast<void*>(&q), 64);
     if (open_res.code() != 0) {
         std::cerr << open_res.msg() << std::endl;
         return 1;
@@ -187,7 +212,7 @@ int main(int argc __maybe_unused, char **argv __maybe_unused) {
     std::cout << "Started tracing, hit Ctrl-C to terminate." << std::endl;
 
     std::thread t1(kevent_poll);
-    std::thread t2(resolve_callchain, tgid, tid);
+    std::thread t2(std::bind(resolve_callchain, std::ref(q), tgid, tid));
     t1.join();
     t2.join();
 
