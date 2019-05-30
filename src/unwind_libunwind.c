@@ -13,8 +13,10 @@
 #include <string.h>
 #include <gelf.h>
 
+#ifdef debug
 #undef debug
 #define debug(args...) ""
+#endif
 
 extern int
 UNW_OBJ(dwarf_search_unwind_table) (unw_addr_space_t as,
@@ -186,7 +188,8 @@ static inline struct map *find_map(unw_word_t ip, struct unwind_info *ui)
 {
      struct map *map = maps__find(ui->thread->maps, ip);
      /* TODO: maybe need to handle dlopen's so here */
-     assert(map != NULL);
+     if (map)
+          debug("find_map's name: %s\n", map->dso->name);
      return map;
 }
 
@@ -248,6 +251,8 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
      unw_dyn_info_t di;
      u64 table_data, segbase, fde_count;
      int ret = -EINVAL;
+
+     debug("find_proc_info called\n");
 
      map = find_map(ip, ui);
      if (!map || !map->dso)
@@ -338,6 +343,7 @@ static int access_mem(unw_addr_space_t as __maybe_unused,
 
      offset = addr - start;
      *valp = *(unw_word_t*)&stack[offset];
+     debug("stack[%d]: 0x%lx\n", offset, *valp);
 
      return 0;
 }
@@ -454,6 +460,7 @@ static int get_entries(struct unwind_info *ui,
 
      val = reg_value(&ui->uc->uregs, LIBUNWIND__ARCH_REG_SP);
      st->ips[i++] = val;
+     debug("get_entries, sp: 0x%" PRIx64 "\n", val);
 
      addr_space = ui->thread->addr_space;
      if (!addr_space)
@@ -462,6 +469,8 @@ static int get_entries(struct unwind_info *ui,
      ret = unw_init_remote(&c, addr_space, ui);
      if (ret)
           display_error(ret);
+
+     debug("ready to run unw_step...\n");
 
      while (!ret && (unw_step(&c) > 0) && i < st->depth) {
           unw_get_reg(&c, UNW_REG_IP, &st->ips[i]);
@@ -480,6 +489,7 @@ static int get_entries(struct unwind_info *ui,
      }
 
      st->depth = i;
+     debug("update st->depth: %d\n", st->depth);
 
      return ret;
 }
@@ -578,6 +588,8 @@ static inline void unwind_register_ops(struct thread *thread,
 int unwind__prepare_access(struct thread *thread, struct map *map,
                           bool *initialized)
 {
+     int err;
+
      if (thread->addr_space) {
           if (!map)
                debug("thread map already set, dso=%s, thread=%p\n",
@@ -588,8 +600,11 @@ int unwind__prepare_access(struct thread *thread, struct map *map,
      }
 
      unwind_register_ops(thread, &unwind_libunwind_ops);
+     err = thread->ulops->prepare_access(thread);
+     if (initialized)
+          *initialized = err ? false : true;
 
-     return 0;
+     return err;
 }
 
 void unwind__flush_access(struct thread *thread)
