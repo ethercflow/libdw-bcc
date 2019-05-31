@@ -69,9 +69,6 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         if (ret < 0)
                 return -1;
 
-        if (!user_mode(ctx))
-                sp = sp - 16;
-
         zuc = zero.lookup(&z);
         if (!zuc)
                 return -1;
@@ -91,6 +88,10 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         if (ret < 0)
                 return -1;
         bpf_get_current_comm(&uc->name, sizeof(uc->name));
+        if (!user_mode(ctx)) {
+                sp -= 16;
+                uc->uregs.sp = (unsigned long)sp;
+        }
         ret = bpf_probe_read_stack(&uc->data, sizeof(uc->data), sp);
         if (ret < 0)
                 return -1;
@@ -178,10 +179,9 @@ class ResolveCallchainTask: public Stoppable {
                     .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
                 };
 
-                std::cout << "sp: 0x" << std::hex << uc.uregs.sp << std::endl;
                 void *cache = bcc_symcache_new(tgid, &symbol_option);
+                std::cout << "TGID: " << tgid << " TID: " << tid << std::endl;
                 for (int i = 0; i < st.depth; i++) {
-                    std::cout << "st.ips[" << i << "]: 0x" << std::hex << st.ips[i] << "    ";
                     if (bcc_symcache_resolve(cache, st.ips[i], &symbol) != 0) {
                         std::cout << "[UNKNOWN]" << std::endl;
                     } else {
@@ -189,17 +189,6 @@ class ResolveCallchainTask: public Stoppable {
                         bcc_symbol_free_demangle_name(&symbol);
                     }
                 }
-               //  std::string fname = std::to_string(uc.tgid) + "-"
-               //      + std::to_string(uc.tgid) + "-" + std::to_string(uc.ts)
-               //      + "-stack.txt";
-               //  std::ofstream sf(fname, std::ios_base::app);
-               //  auto p = reinterpret_cast<unw_word_t*>(uc.data);
-               //  for (int i = 0; i < uc.size / 8; i++) {
-               //      sf << std::hex << *p << std::endl;
-               //      ++p;
-               //  }
-               //  sf.close();
-               //  exit(0);
             }
 
             machine__delete(machine);
