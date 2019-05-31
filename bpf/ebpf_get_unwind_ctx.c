@@ -54,6 +54,9 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         if (ret < 0)
                 return -1;
 
+        if (!user_mode(ctx))
+                sp = sp - 16;
+
         zuc = zero.lookup(&z);
         if (!zuc)
                 return -1;
