@@ -37,6 +37,10 @@ int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 # define LIBUNWIND__ARCH_REG_SP    X86_SP
 #endif
 
+#ifndef LIBUNWIND__ARCH_REG_IP
+# define LIBUNWIND__ARCH_REG_IP    X86_IP
+#endif
+
 int LIBUNWIND__ARCH_REG_ID(int regnum);
 int unwind__prepare_access(struct thread *thread, struct map *map,
 						  bool *initialized);

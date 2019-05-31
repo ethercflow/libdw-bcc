@@ -458,7 +458,7 @@ static int get_entries(struct unwind_info *ui,
           return EINVAL;
      }
 
-     val = reg_value(&ui->uc->uregs, LIBUNWIND__ARCH_REG_SP);
+     val = reg_value(&ui->uc->uregs, LIBUNWIND__ARCH_REG_IP);
      st->ips[i++] = val;
      debug("get_entries, sp: 0x%" PRIx64 "\n", val);
 
