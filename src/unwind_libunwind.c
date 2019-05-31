@@ -186,8 +186,12 @@ static u64 elf_section_offset(int fd, const char *name)
 
 static inline struct map *find_map(unw_word_t ip, struct unwind_info *ui)
 {
+     /**
+      * TODO:
+      * 1. add a cache
+      * 2. maybe need to handle dlopen's so here
+      */
      struct map *map = maps__find(ui->thread->maps, ip);
-     /* TODO: maybe need to handle dlopen's so here */
      if (map)
           debug("find_map's name: %s\n", map->dso->name);
      return map;
@@ -321,13 +325,15 @@ static int access_mem(unw_addr_space_t as __maybe_unused,
      int offset;
      int ret;
 
-     if (__write || !stack || ss <= 0) { // TODO: need to judge uregs?
+     if (__write || !stack || ss <= 0) {
           *valp = 0;
           return 0;
      }
 
      start = reg_value(&ui->uc->uregs, LIBUNWIND__ARCH_REG_SP);
      end = start + ss;
+     debug("start: 0x%" PRIx64 " end: 0x%" PRIx64 "ss: %d\n",
+           start, end, ss);
 
      if (addr + sizeof(unw_word_t) < addr)
           return -EINVAL;
@@ -343,7 +349,7 @@ static int access_mem(unw_addr_space_t as __maybe_unused,
 
      offset = addr - start;
      *valp = *(unw_word_t*)&stack[offset];
-     debug("stack[%d]: 0x%lx\n", offset, *valp);
+     debug("access addr: 0x%lx, stack[%d]: 0x%lx\n", addr, offset, *valp);
 
      return 0;
 }
@@ -361,6 +367,7 @@ static int access_reg(unw_addr_space_t as __maybe_unused,
 
      id = LIBUNWIND__ARCH_REG_ID(regnum);
      *valp = reg_value(&ui->uc->uregs, id);
+     debug("access_reg %d: %lx\n", id, *valp);
 
      return 0;
 }
@@ -460,7 +467,7 @@ static int get_entries(struct unwind_info *ui,
 
      val = reg_value(&ui->uc->uregs, LIBUNWIND__ARCH_REG_IP);
      st->ips[i++] = val;
-     debug("get_entries, sp: 0x%" PRIx64 "\n", val);
+     debug("get_entries, ip: 0x%" PRIx64 "\n", val);
 
      addr_space = ui->thread->addr_space;
      if (!addr_space)
