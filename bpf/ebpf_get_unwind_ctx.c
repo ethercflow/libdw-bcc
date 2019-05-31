@@ -54,9 +54,6 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         if (ret < 0)
                 return -1;
 
-        if (!user_mode(ctx))
-                sp = sp - 16;
-
         zuc = zero.lookup(&z);
         if (!zuc)
                 return -1;
@@ -75,6 +72,10 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         if (ret < 0)
                 return -1;
         bpf_get_current_comm(&uc->name, sizeof(uc->name));
+        if (!user_mode(ctx)) {
+                sp -= 16;
+                uc->uregs.sp = (unsigned long)sp;
+        }
         ret = bpf_probe_read_stack(&uc->data, sizeof(uc->data), sp);
         if (ret < 0)
                 return -1;
