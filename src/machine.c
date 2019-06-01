@@ -1,6 +1,6 @@
 #include "machine.h"
 #include "thread.h"
-#include "libdw_bcc.h"
+#include "libdw_bpf.h"
 #include "map.h"
 #include "rbtree.h"
 #include <string.h>

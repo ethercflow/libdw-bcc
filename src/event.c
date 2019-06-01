@@ -3,7 +3,7 @@
 #include "machine.h"
 #include "utility.h"
 #include "event.h"
-#include "libdw_bcc.h"
+#include "libdw_bpf.h"
 #include "unwind.h"
 #include <assert.h>
 #include <sys/mman.h>

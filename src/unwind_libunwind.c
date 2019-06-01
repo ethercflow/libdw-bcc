@@ -5,7 +5,7 @@
 #include "utility.h"
 #include "dso.h"
 #include "map.h"
-#include "libdw_bcc.h"
+#include "libdw_bpf.h"
 #include <libunwind.h>
 #include <libunwind-x86_64.h>
 #include <errno.h>

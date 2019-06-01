@@ -6,7 +6,7 @@
 #include <cinttypes>
 #include <csignal>
 #include <thread>
-#include <libdw_bcc.h>
+#include <libdw_bpf.h>
 #include <cstdlib>
 #include <elf.h>
 
