@@ -1,8 +1,18 @@
-# libdw-bcc
+# libdw-bpf
 
-A DWARF-based user-stack unwinding library for bcc.
+A DWARF-based user-stack unwinding library for bpf.
 
-# interface
+Currently the BPF_CALL `bpf_get_stackid` traverses the frame list through the fp
+register to implement user-stack unwinding, which is very efficient. But on
+x86_64 platform, the frame pointer is used only in cases where the stack frame
+may be of variable size, this situation makes `bpf_get_stackid` useless, so
+this project born.
+
+## Installing
+
+See [INSTALL.md](INSTALL.md) for installation steps on your platform.
+
+## Interface
 
 ``` c
 #ifdef __cplusplus
@@ -47,3 +57,28 @@ void machine__delete(machine_t *machine);
 }
 #endif
 ```
+
+## Usage
+### Get frames
+1. Call `machine__new` to get a machine_t object
+2. call `bpf_unwind_ctx__thread_map` to get a process's address space
+   information and manage DSOs (include the process's binary) info. It's only
+   need to be called once for each process (tgid), other threads of the process
+   will share these info with the tgid
+3. Write eBPF code to handle events and call
+   [get_unwind_ctx](bpf/ebpf_get_unwind_ctx.c) to create and pass`unwind_ctx` objs
+   to the perf ring buffer
+4. Call `bpf_unwind_ctx__reslove_callchain` to get frames
+
+### Get symbol name
+We can use the [libbcc](http://github.com/iovisor/bcc):
+
+Call `bcc_symcache_new` and `bpf_symbol_symcache_resolve` to get symbol name
+
+### Cleanup
+Call `machine__delete` to release resources
+
+## Examples
+- [uprobe event](examples/uprobe.cc)
+- [kprobe event](examples/syscall.cc)
+- [tracepoint event](examples/pwrite64_event.cc)
