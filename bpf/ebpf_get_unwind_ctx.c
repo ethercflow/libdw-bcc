@@ -28,7 +28,8 @@ BPF_HASH(cache, struct key_, struct unwind_ctx);
 
 BPF_PERF_OUTPUT(unwind_ctxs);
 
-static __inline int get_unwind_ctx(struct pt_regs *ctx)
+static __inline
+int get_unwind_ctx(struct pt_regs *ctx, bool tracepoint, void *attr)
 {
         struct pt_regs *user_regs = NULL;
         struct task_struct *task = NULL;
@@ -40,7 +41,7 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         int z = 0;
 
         task = (struct task_struct *)bpf_get_current_task();
-        if (user_mode(ctx)) {
+        if (!tracepoint && ctx && user_mode(ctx)) {
                 user_regs = ctx;
         } else {
                 if (task->mm)
@@ -72,7 +73,7 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         if (ret < 0)
                 return -1;
         bpf_get_current_comm(&uc->name, sizeof(uc->name));
-        if (!user_mode(ctx)) {
+        if (!tracepoint && ctx && !user_mode(ctx)) {
                 sp -= 16;
                 uc->uregs.sp = (unsigned long)sp;
         }
@@ -84,7 +85,10 @@ static __inline int get_unwind_ctx(struct pt_regs *ctx)
         else
                 uc->size = STACK_SIZE - ret;
 
-        unwind_ctxs.perf_submit(ctx, uc, sizeof(*uc));
+        if (tracepoint)
+                unwind_ctxs.perf_submit(attr, uc, sizeof(*uc));
+        else
+                unwind_ctxs.perf_submit(ctx, uc, sizeof(*uc));
 
         cache.delete(&k);
 
