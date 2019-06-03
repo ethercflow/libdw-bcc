@@ -138,7 +138,7 @@ static void unwind_ctx_handler(void *cb_cookie,
     auto uc = static_cast<unwind_ctx*>(raw);
     auto q = static_cast<Queue<unwind_ctx>*>(cb_cookie);
     if (uc->tgid == tgid) {
-        q->push(*uc);
+        q->push(uc);
     }
 }
 
@@ -169,22 +169,20 @@ class ResolveCallchainTask: public Stoppable {
             st.depth = maxdepth;
             st.ips = reinterpret_cast<u64*>(calloc(sizeof(u64*), st.depth));
 
+            bcc_symbol symbol;
+            bcc_symbol_option symbol_option = {
+                .use_debug_file = 1,
+                .check_debug_file_crc = 1,
+                .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
+            };
+            void *cache = bcc_symcache_new(tgid, &symbol_option);
             while (stopRequested() == false) {
                 auto uc = q->pop();
-                auto ret = bpf_unwind_ctx__resolve_callchain(&st, machine, &uc);
+                auto ret = bpf_unwind_ctx__resolve_callchain(&st, machine, uc);
                 if (ret) {
                     std::cerr << "resolve_callchain failed: " << ret << std::endl;
                     exit(1);
                 }
-
-                bcc_symbol symbol;
-                bcc_symbol_option symbol_option = {
-                    .use_debug_file = 1,
-                    .check_debug_file_crc = 1,
-                    .use_symbol_type = (1 << STT_FUNC) | (1 << STT_GNU_IFUNC)
-                };
-
-                void *cache = bcc_symcache_new(tgid, &symbol_option);
                 std::cout << "TGID: " << tgid << " TID: " << tid << std::endl;
                 for (int i = 0; i < st.depth; i++) {
                     if (bcc_symcache_resolve(cache, st.ips[i], &symbol) != 0) {
@@ -195,7 +193,7 @@ class ResolveCallchainTask: public Stoppable {
                     }
                 }
             }
-
+            bcc_free_symcache(cache, tgid);
             machine__delete(machine);
         }
     private:
