@@ -10,6 +10,8 @@ else ()
   set(CMAKE_CXX_STANDARD 11)
 endif ()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer")
+
 add_executable(syscall syscall.cc)
 target_link_libraries(syscall dw_bpf-static)
 target_link_libraries(syscall elf)
@@ -17,6 +19,14 @@ target_link_libraries(syscall unwind-x86_64)
 target_link_libraries(syscall unwind)
 target_link_libraries(syscall pthread)
 target_link_libraries(syscall bcc)
+
+add_executable(syscall_parallel syscall_parallel.cc)
+target_link_libraries(syscall_parallel dw_bpf-static)
+target_link_libraries(syscall_parallel elf)
+target_link_libraries(syscall_parallel unwind-x86_64)
+target_link_libraries(syscall_parallel unwind)
+target_link_libraries(syscall_parallel pthread)
+target_link_libraries(syscall_parallel bcc)
 
 add_executable(uprobe uprobe.cc)
 target_link_libraries(uprobe dw_bpf-static)
