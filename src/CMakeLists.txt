@@ -15,11 +15,24 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wmissing-prototypes")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wmissing-declarations")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wno-unused-result")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wdeclaration-after-statement")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer")
 
 file(GLOB libdw_bpf_sources "${CMAKE_CURRENT_SOURCE_DIR}/*.c")
 add_library(dw_bpf-static STATIC ${libdw_bpf_sources})
+target_link_libraries(dw_bpf-static LINK_PRIVATE
+  ${LIBUNWIND_LIBRARY}
+  ${LIBUNWIND_PLATFORM_LIBRARY}
+  ${LIBELF_LIBRARIES}
+  ${CMAKE_THREAD_LIBS_INIT}
+)
 set_target_properties(dw_bpf-static PROPERTIES OUTPUT_NAME dw_bpf)
 add_library(dw_bpf-shared SHARED ${libdw_bpf_sources})
+target_link_libraries(dw_bpf-shared LINK_PRIVATE
+  ${LIBUNWIND_LIBRARIES}
+  ${LIBUNWIND_PLATFORM_LIBRARIES}
+  ${LIBELF_LIBRARIES}
+  ${CMAKE_THREAD_LIBS_INIT}
+)
 set_target_properties(dw_bpf-shared PROPERTIES VERSION ${REVISION_LAST} SOVERSION 0)
 set_target_properties(dw_bpf-shared PROPERTIES OUTPUT_NAME dw_bpf)
 

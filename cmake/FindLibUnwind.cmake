@@ -31,13 +31,21 @@
 #  License text for the above reference.)
 
 
-find_path(LIBUNWIND_INCLUDE_DIR libunwind.h )
+find_path(LIBUNWIND_INCLUDE_DIR libunwind.h)
 if(NOT EXISTS "${LIBUNWIND_INCLUDE_DIR}/unwind.h")
   MESSAGE("Found libunwind.h but corresponding unwind.h is absent!")
   SET(LIBUNWIND_INCLUDE_DIR "")
 endif()
 
 find_library(LIBUNWIND_LIBRARY unwind)
+
+find_path(LIBUNWIND_PLATFORM_INCLUDE_DIR libunwind-x86_64.h)
+
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64")
+  set(LIBUNWIND_ARCH "x86_64")
+endif()
+
+find_library(LIBUNWIND_PLATFORM_LIBRARY NAMES "unwind-${LIBUNWIND_ARCH}" DOC "unwind library platform")
 
 if(LIBUNWIND_INCLUDE_DIR AND EXISTS "${LIBUNWIND_INCLUDE_DIR}/libunwind-common.h")
   file(STRINGS "${LIBUNWIND_INCLUDE_DIR}/libunwind-common.h" LIBUNWIND_HEADER_CONTENTS REGEX "#define UNW_VERSION_[A-Z]+\t[0-9]*")
@@ -86,4 +94,16 @@ if (LIBUNWIND_FOUND)
   set(LIBUNWIND_INCLUDE_DIRS ${LIBUNWIND_INCLUDE_DIR})
 endif ()
 
-mark_as_advanced( LIBUNWIND_INCLUDE_DIR LIBUNWIND_LIBRARY )
+mark_as_advanced(LIBUNWIND_INCLUDE_DIR LIBUNWIND_LIBRARY)
+
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(LibUnwind-x86_64 REQUIRED_VARS  LIBUNWIND_PLATFORM_INCLUDE_DIR
+                                                                  LIBUNWIND_PLATFORM_LIBRARY
+                                                   VERSION_VAR    LIBUNWIND_VERSION_STRING
+                                 )
+
+if (LIBUNWIND-X86_64_FOUND)
+  set(LIBUNWIND_PLATFORM_LIBRARIES ${LIBUNWIND_PLATFORM_LIBRARY})
+  set(LIBUNWIND_PLATFORM_INCLUDE_DIRS ${LIBUNWIND_PLATFORM_INCLUDE_DIR})
+endif()
+
+mark_as_advanced(LIBUNWIND_PLATFORM_INCLUDE_DIR LIBUNWIND_PLATFORM_LIBRARY)
