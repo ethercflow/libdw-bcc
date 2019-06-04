@@ -38,6 +38,6 @@ set_target_properties(dw_bpf-shared PROPERTIES OUTPUT_NAME dw_bpf)
 
 set(dw_bpf_api_headers libdw_bpf.h ptrace.h types.h)
 
-install(TARGETS dw_bpf-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/dw_bpf)
-install(FILES ${dw_bpf_api_headers} DESTINATION include/dw_bpf)
+install(TARGETS dw_bpf-shared LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${dw_bpf_api_headers} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/dw_bpf)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libdw_bpf.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
