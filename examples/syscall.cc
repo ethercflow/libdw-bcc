@@ -151,6 +151,12 @@ class EventPollTask: public Stoppable {
         }
 };
 
+int __callback(struct dl_phdr_info *info, void *ctx) {
+    std::cerr << "dso's name: " << info->dlpi_name << std::endl;
+    std::cerr << "start addr: 0x" << std::hex << info->start_addr << std::endl;
+    std::cerr << "end addr: 0x" << std::hex << info->end_addr << std::endl;
+}
+
 class ResolveCallchainTask: public Stoppable {
     public:
         void init(pid_t _tgid, pid_t _tid, Queue<unwind_ctx> *_q) {
@@ -164,6 +170,7 @@ class ResolveCallchainTask: public Stoppable {
             if (ret) {
                 std::cerr << "thread_map failed: " << ret << std::endl;
             }
+            bpf_dl_iterate_phdr(machine, tgid, __callback, NULL);
 
             struct stacktrace st;
             st.depth = maxdepth;
