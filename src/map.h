@@ -14,10 +14,8 @@ struct machine;
 struct mmap2_event;
 
 struct map {
-     union {
-          struct rb_node rb_node;
-          struct list_head node;
-     };
+     struct rb_node rb_node;
+     struct list_head node;
      u64 start;
      u64 end;
      u8 type;
@@ -68,6 +66,7 @@ struct map *map__next(struct map *map);
 
 struct maps {
      struct rb_root entries;
+     struct list_head head;
      struct rw_semaphore lock;
      struct machine *machine;
      refcount_t refcnt;

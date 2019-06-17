@@ -22,6 +22,7 @@ void map__init(struct map *map, struct mmap2_event *event, struct dso *dso)
 	map->map_ip = map_ip;
 	map->unmap_ip = unmap_ip;
 	RB_CLEAR_NODE(&map->rb_node);
+	INIT_LIST_HEAD(&map->node);
 	refcount_set(&map->refcnt, 1);
 }
 
@@ -57,8 +58,10 @@ void map__delete(struct map *map)
 
 void map__put(struct map *map)
 {
-	if (map && refcount_dec_and_test(&map->refcnt))
+	if (map && refcount_dec_and_test(&map->refcnt)) {
+		list_del_init(&map->node);
 		map__delete(map);
+	}
 }
 
 struct map *map__next(struct map *map) {
@@ -72,6 +75,7 @@ struct map *map__next(struct map *map) {
 static void maps__init(struct maps *maps, struct machine *machine)
 {
 	maps->entries = RB_ROOT;
+	INIT_LIST_HEAD(&maps->head);
 	init_rwsem(&maps->lock);
 	maps->machine = machine;
 }
@@ -180,6 +184,7 @@ static void __maps__insert(struct maps *maps, struct map *map)
 
 	rb_link_node(&map->rb_node, parent, p);
 	rb_insert_color(&map->rb_node, &maps->entries);
+	list_add_tail(&map->node, &maps->head);
 	map__get(map);
 }
 

@@ -158,3 +158,27 @@ int bpf_unwind_ctx__resolve_callchain(struct stacktrace *st,
 
     return unwind__get_entries(NULL, NULL, thread, uc, st);
 }
+
+int bpf_dl_iterate_phdr(machine_t *machine, pid_t tgid,
+                        int (*__callback)(struct dl_phdr_info *info, void *ctx),
+                        void *ctx)
+{
+    struct thread *thread;
+    struct map *pos;
+    struct dl_phdr_info info;
+    int ret;
+
+    thread = machine__findnew_thread(machine, tgid, tgid);
+    assert(thread != NULL);
+
+    list_for_each_entry(pos, &thread->maps->head, node) {
+        info.start_addr = pos->start;
+        info.end_addr = pos->end;
+        info.dlpi_name = pos->dso->name;
+        ret = __callback(&info, ctx);
+        if (ret < 0)
+            return -1;
+    }
+
+    return 0;
+}
