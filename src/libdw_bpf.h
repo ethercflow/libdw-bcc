@@ -48,10 +48,10 @@ int bpf_unwind_ctx__thread_map(machine_t *machine, pid_t tgid, pid_t tid);
 int bpf_unwind_ctx__resolve_callchain(struct stacktrace *st,
                                       machine_t *machine,
                                       struct unwind_ctx *uc);
-void machine__delete(machine_t *machine);
 int bpf_dl_iterate_phdr(machine_t *machine, pid_t tgid,
                         int (*__callback)(struct dl_phdr_info *info, void *ctx),
                         void *ctx);
+void machine__delete(machine_t *machine);
 
 #ifdef __cplusplus
 }
