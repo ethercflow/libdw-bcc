@@ -301,7 +301,7 @@ static int access_dso_mem(struct unwind_info *ui, unw_word_t addr,
 
      map = find_map(addr, ui);
      if (!map) {
-          fprintf(stderr, "unwind: no map for %lx\n", (unsigned long)addr);
+          debug("unwind: no map for %lx\n", (unsigned long)addr);
           return -1;
      }
 
